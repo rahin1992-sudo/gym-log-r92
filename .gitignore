@@ -1,0 +1,7 @@
+backups/
+qr.png
+_shots/
+_chrome*/
+node_modules/
+*.log
+.wrangler/

@@ -1,0 +1,555 @@
+{
+  "title": "Book of Pain 2 — Udholdenhed",
+  "days": [
+    {
+      "name": "Mandag",
+      "groups": [
+        "Mave",
+        "Håndled",
+        "Bryst",
+        "Bicep"
+      ]
+    },
+    {
+      "name": "Onsdag",
+      "groups": [
+        "Mave",
+        "Ryg",
+        "Tricep"
+      ]
+    },
+    {
+      "name": "Fredag",
+      "groups": [
+        "Mave",
+        "Håndled",
+        "Ben/Læg",
+        "Deltoid"
+      ]
+    }
+  ],
+  "groups": {
+    "Bryst": [
+      {
+        "name": "Bench Press",
+        "weight": "8.75/10/10/11.25 på hver side",
+        "reps": "20/15/12/8",
+        "style": "Stigende vægt"
+      },
+      {
+        "name": "Incline Dumbell Press",
+        "weight": "15 kg x 2",
+        "reps": "8/9/10",
+        "style": "Dynamisk"
+      },
+      {
+        "name": "Dumbell Incline Fly",
+        "weight": "9/8/10 x 2",
+        "reps": "15/15/10",
+        "style": "Stigende vægt"
+      },
+      {
+        "name": "Kabel-Bryst",
+        "weight": "11.4/15.9/11.4/11.4 på hver side",
+        "reps": "20/15/12/MAX",
+        "style": ""
+      }
+    ],
+    "Bicep": [
+      {
+        "name": "Barbell Curls",
+        "weight": "5/5/6.25 hver side",
+        "reps": "20/15/12",
+        "style": "Stigende vægt"
+      },
+      {
+        "name": "Preacher curl one hand",
+        "weight": "8/6/7kg",
+        "reps": "8/7/6",
+        "style": "Langsomt - 5 sek"
+      },
+      {
+        "name": "Concentration Curls",
+        "weight": "10/9/8kg",
+        "reps": "6/7/8",
+        "style": "Dynamisk"
+      },
+      {
+        "name": "Long Head Bicep Curls",
+        "weight": "8/7/5kg",
+        "reps": "12/13/15",
+        "style": "Faldene vægt"
+      },
+      {
+        "name": "Pull up Hanging biceps",
+        "weight": "",
+        "reps": "70%/70%/100%",
+        "style": "Konstant pres"
+      },
+      {
+        "name": "Dumbell Pullover",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Spider Curls",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      }
+    ],
+    "Ben/Læg": [
+      {
+        "name": "Squat",
+        "weight": "15 kg x 2",
+        "reps": "20/15/12/10",
+        "style": "Stigende vægt"
+      },
+      {
+        "name": "Pistol Squat",
+        "weight": "egen vægt på box",
+        "reps": "8-10 x 2",
+        "style": ""
+      },
+      {
+        "name": "Leg Extensions",
+        "weight": "45-50 kg",
+        "reps": "15/12/10",
+        "style": "Dynamisk"
+      },
+      {
+        "name": "Leg Curls Liggende (bagben)",
+        "weight": "45-50 kg",
+        "reps": "20/15/12/8",
+        "style": "Stigende vægt"
+      },
+      {
+        "name": "Sjipning",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Calf Raise Maskine",
+        "weight": "Barbell 15kg x2",
+        "reps": "20/20/15 + 10/8/100%",
+        "style": "Dynamisk + Langsomt - 3 sek"
+      },
+      {
+        "name": "Leg Curls siddene (bagben)",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Leg Press",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      }
+    ],
+    "Ryg": [
+      {
+        "name": "Superman + twist",
+        "weight": "",
+        "reps": "12 + 20 sek x 3",
+        "style": ""
+      },
+      {
+        "name": "Cable lænd",
+        "weight": "2.5x2/3.75x2/3.75x2/5x2",
+        "reps": "20 x 2",
+        "style": ""
+      },
+      {
+        "name": "Lateral skulder",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "EZ-Bar pullover",
+        "weight": "10x2/12.5x2/12.5x2/15x2",
+        "reps": "20/15/12",
+        "style": "Stigende vægt"
+      },
+      {
+        "name": "Dødløft",
+        "weight": "10kg/5kg/0",
+        "reps": "8/7/7/5/3",
+        "style": ""
+      },
+      {
+        "name": "Bent over Rows",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "• Underhånd grep",
+        "weight": "15 kg x 2",
+        "reps": "20/15 + 8",
+        "style": "Stigende vægt + Langsomt - 5 sek"
+      },
+      {
+        "name": "• Overhånds grep",
+        "weight": "",
+        "reps": "20/15 + 8",
+        "style": "Stigende vægt + Langsomt - 5 sek"
+      },
+      {
+        "name": "Dumbell Rows",
+        "weight": "20 kg",
+        "reps": "12/10/8 m. 2 sek",
+        "style": "Ved Top stress holdes 2 sek"
+      },
+      {
+        "name": "Back hyperextensions",
+        "weight": "0kg/10kg/5kg",
+        "reps": "12/15/20",
+        "style": "Faldene vægt"
+      },
+      {
+        "name": "Lats Pull ups",
+        "weight": "",
+        "reps": "10/8/6/6/5 eller 5 x Max m. 30 sek interval",
+        "style": "Langsomt - 3 sek"
+      },
+      {
+        "name": "Lats Pull Down machine",
+        "weight": "30kg/25kg/20kg",
+        "reps": "20/15/12",
+        "style": "Stigende vægt"
+      },
+      {
+        "name": "Ro maskine",
+        "weight": "",
+        "reps": "20/15/12/6",
+        "style": "Stigende vægt"
+      },
+      {
+        "name": "Dips Maskine med Ryg",
+        "weight": "",
+        "reps": "70%/100%/100%",
+        "style": "Perfekte Reps"
+      }
+    ],
+    "Traps": [
+      {
+        "name": "Dumbell shrugs",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Barbell Shrugs",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      }
+    ],
+    "Deltoid": [
+      {
+        "name": "Shoulder Rotation Side/Lying",
+        "weight": "",
+        "reps": "15/12",
+        "style": "Langsomt - 2 sek"
+      },
+      {
+        "name": "Shoulder Kable Rotation",
+        "weight": "",
+        "reps": "16/13/10",
+        "style": "Normal Dynamisk"
+      },
+      {
+        "name": "Straight Raises on Incline Bench",
+        "weight": "",
+        "reps": "12/10/8",
+        "style": "Dynamisk - kort pause"
+      },
+      {
+        "name": "Bent Over Low-Pulley Side Lateral",
+        "weight": "",
+        "reps": "15/12/8",
+        "style": "Dynamisk - Hold 2 sek"
+      },
+      {
+        "name": "Arnold Shoulder Press",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "• Barbell",
+        "weight": "12.5 kg x 2",
+        "reps": "20/15/12",
+        "style": "Stigende vægt"
+      },
+      {
+        "name": "• Dumbells",
+        "weight": "12.5 kg",
+        "reps": "6/6",
+        "style": "Langsomt - 5 sek"
+      },
+      {
+        "name": "Upright Rows superset med lateral Raises",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "• Upright Rows",
+        "weight": "10 kg x 2",
+        "reps": "15/15/15",
+        "style": "Dynamisk"
+      },
+      {
+        "name": "• Lateral Raises",
+        "weight": "7,5 kg",
+        "reps": "15/12/10",
+        "style": "Stigende el. samme vægt"
+      },
+      {
+        "name": "Frontal Raises",
+        "weight": "Dumbells 7 kg",
+        "reps": "15/12/10",
+        "style": "Stigende el. samme vægt"
+      },
+      {
+        "name": "Frontal Raises Elastic",
+        "weight": "",
+        "reps": "70%/100%/70%",
+        "style": "Konstant pres"
+      },
+      {
+        "name": "Lying rear delt raises",
+        "weight": "3-4 kg",
+        "reps": "10/12/15",
+        "style": "Faldene vægt"
+      },
+      {
+        "name": "Side lying lateral raise",
+        "weight": "4-5 kg",
+        "reps": "12/10/10",
+        "style": "Stigenede vægt"
+      },
+      {
+        "name": "Cable rear delt reverse flys",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      }
+    ],
+    "Tricep": [
+      {
+        "name": "Cable extension",
+        "weight": "29.5kg",
+        "reps": "21/21",
+        "style": ""
+      },
+      {
+        "name": "Skull Chrusher",
+        "weight": "2.5 kg x 2/2.5x2/3.75x2",
+        "reps": "20/15/12",
+        "style": "Stigende vægt"
+      },
+      {
+        "name": "Dips",
+        "weight": "",
+        "reps": "MAX/MAX",
+        "style": "Langsomt - 3 sek"
+      },
+      {
+        "name": "One arm Dumbell",
+        "weight": "6 kg",
+        "reps": "15/18/20",
+        "style": "Faldene vægt"
+      }
+    ],
+    "Håndled": [
+      {
+        "name": "Wrist Curls",
+        "weight": "7/8/8",
+        "reps": "20/15/12",
+        "style": "Stigende vægt"
+      },
+      {
+        "name": "Reverse Wrist Curls",
+        "weight": "4/4/5",
+        "reps": "15/12",
+        "style": "Langsomt - 3 sek + Samme vægt"
+      },
+      {
+        "name": "Finger Curls",
+        "weight": "15 kg barbell",
+        "reps": "20/15/12",
+        "style": "Stigende vægt"
+      },
+      {
+        "name": "Standing Barbell Back Wrist Curl",
+        "weight": "",
+        "reps": "70%/100%/70%",
+        "style": "Reps køres indtil fatigue"
+      },
+      {
+        "name": "Seat low cable wrist curls",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      }
+    ],
+    "Mave": [
+      {
+        "name": "Dragon fly",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Weighted sit up",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Weighted leg raises",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Butterfly",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Atomic situp",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Rullemarie",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Cable Crunch",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Toe toucher",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Side jackknife",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Jackknife",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Rulle Rundt",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Bottoms up",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Situp + leg raises med bold",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Skrå bænk mave",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Sit up",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Dumbell Side Bend",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Bold Side",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Hanging leg Raises",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Side sit up",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Plank",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Leg raises over obstacle",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Hanging leg side raises",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "L-sit",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Nedre Side Vægt",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      },
+      {
+        "name": "Nedre Side Kabel",
+        "weight": "",
+        "reps": "",
+        "style": ""
+      }
+    ]
+  }
+}
