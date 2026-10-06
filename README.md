@@ -5,6 +5,11 @@ Programmet vælges øverst på forsiden. Uge, vægte, alternativer og afstregnin
 gemmes separat. Første besøg for eksisterende brugere beholder BTS og deres uge.
 Nye installationer åbner Min-Max.
 
+Ved hver øvelse vises den sidste registrering med uge, træningsdag og kg/reps for
+hvert sæt. Automatisk udfyldte vægte tæller ikke som nye resultater. Øvelsesalternativer
+og sæt med høje reps har hver deres sammenligning. RIR, RPE og supersæt forklares
+ved øvelsen. Andre forkortelser kan læses under "Forkortelser i denne øvelse".
+
 ## Min-Max-programmet
 
 - 12 uger: Upper, Lower, hvile, Push, Pull, hvile.
@@ -47,7 +52,7 @@ Fil- og skybackup indeholder begge programmer. Gendannelse fletter logs og bevar
 nyere lokale registreringer samt andre programmers historik. Nulstilling gælder
 kun det valgte program. Det oprindelige `program.json` er uændret.
 
-Service worker v19 cacher begge programmer og kun appens statiske filer.
+Service worker v20 cacher begge programmer og kun appens statiske filer.
 Backup-API'er og eksterne svar caches ikke. Efter en udgivelse kan en allerede
 åben installation kræve, at man lukker og åbner appen igen online.
 
@@ -55,6 +60,7 @@ Backup-API'er og eksterne svar caches ikke. Efter en udgivelse kan en allerede
 
 ```sh
 node --test tests/program-state.test.cjs
+node --test tests/exercise-history.test.cjs
 node tests/browser.cjs
 ```
 

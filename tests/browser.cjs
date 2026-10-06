@@ -48,11 +48,18 @@ const server=http.createServer((req,res)=>{
     await page.locator('.ex-card.open [data-swap]').click();
     await page.locator('.ex-card.open [data-swap]').click();
     assert.equal(await page.locator('.ex-card.open [data-w="0"]').inputValue(),'60');
+    await page.goto(base+'/#/p/min-max-phase-2/w/2/d/0/e/0');
+    await page.locator('.previous-title').first().waitFor();
+    assert.match(await page.locator('.ex-card.open .previous-session').textContent(),/uge 1/);
+    assert.match(await page.locator('.ex-card.open .previous-session').textContent(),/60 kg × 6 reps/);
+    await page.locator('.ex-card.open .abbreviation-help summary').click();
+    assert.match(await page.locator('.ex-card.open .abbreviation-help').textContent(),/1 = én tilbage/);
     if(process.env.SHOT_DIR)await page.screenshot({path:path.join(process.env.SHOT_DIR,'workout-mobile.png'),fullPage:true});
     // Superset switches after each set and the timer uses seconds.
     await page.goto(base+'/#/p/min-max-phase-2/w/1/d/0/e/7');
     await page.locator('.ex-card.open [data-sd="0"]').click();
     await page.waitForURL('**/e/8');
+    assert.match(await page.locator('.ex-card.open .technique').first().textContent(),/S1 = superset/);
     await page.locator('.ex-card.open [data-sd="0"]').click();
     await page.waitForURL('**/e/7');
     assert.equal(await page.evaluate(()=>timer.total),30);
