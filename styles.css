@@ -602,6 +602,18 @@ body.has-timer .toast { bottom: calc(100px + var(--safe-bot)); }
 .exercise-plan { padding: 2px 0 12px; overflow-wrap: anywhere; }
 .exercise-plan p { margin: 8px 0; }
 .exercise-plan .rir-help { color: var(--muted); font-size: 12px; }
+.abbreviation-help { margin: 10px 0; }
+.abbreviation-help dl { margin: 8px 0; font-size: 13px; }
+.abbreviation-help dt { color: var(--gold-2); font-weight: 700; margin-top: 10px; }
+.abbreviation-help dd { margin: 3px 0 0; line-height: 1.5; }
+.previous-session { margin: 0 0 14px; padding: 12px; background: var(--gold-dim); border: 1px solid var(--line-strong); border-radius: 12px; }
+.previous-title { margin: 0; font-size: 14px; color: var(--gold-2); font-weight: 700; }
+.previous-count { margin: 4px 0 8px; font-size: 12px; color: var(--muted); }
+.previous-session ol { list-style: none; padding: 0; margin: 0; }
+.previous-session li { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; font-size: 13px; }
+.previous-session li b { text-align: right; overflow-wrap: anywhere; }
+.previous-session.empty { background: var(--bg-elev); color: var(--muted); }
+.previous-session.empty p { margin: 0; font-size: 13px; }
 .technique, .rep-label { color: var(--gold-2); }
 .session-note { padding: 12px; border: 1px solid var(--line-strong); border-radius: 12px; color: var(--muted); }
 .set-lab { font-size: 13px; }

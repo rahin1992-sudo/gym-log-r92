@@ -232,23 +232,36 @@ function currentSets(week, dayIdx, exIdx, ex) {
 function lastForExercise(name, week, dayIdx, repLabel) {
   const target = nameKey(name);
   let best = null;
+  let sheetHistory = null;
   for (const w of allWeeks()) {
     w.days.forEach((d, di) => {
       d.exercises.forEach((ex, ei) => {
         if ((ex.repLabel || "") !== (repLabel || "")) return;
-        const user = getLog(w.number, di, ei);
-        if (nameKey(user?.name || ex.name) !== target) return;
         const earlier = w.number < week || (w.number === week && di < dayIdx);
         if (!earlier) return;
-        const sets = user?.sets?.some((s) => s.weight) ? user.sets : sheetSets(ex);
-        if (!sets.some((s) => s.weight)) return;
-        if (!best || w.number > best.week || (w.number === best.week && di > best.dayIdx)) {
-          best = { week: w.number, dayIdx: di, sets, name: ex.name };
+        const user = getLog(w.number, di, ei);
+        const alts = altsOf(ex);
+        const selectedName = user?.name || alts[Number(user?.alt || 0)]?.name || ex.name;
+        const candidates = [
+          { ...user, name: selectedName },
+          ...Object.entries(user?.variants || {}).filter(([alt]) => Number(alt) !== Number(user?.alt || 0))
+            .map(([alt, log]) => ({ ...log, name: alts[Number(alt)]?.name })),
+        ];
+        for (const log of candidates) {
+          if (nameKey(log.name) !== target || !Array.isArray(log.sets)) continue;
+          if ((log.source === "prefill" || log.source === "sheet") && !log.done && !log.sets.some((s) => s.done)) continue;
+          if (!log.sets.some((s) => String(s.weight ?? "").trim() || /^\d+(?:[.,]\d+)?$/.test(String(s.reps ?? "").trim()))) continue;
+          if (!best || w.number > best.week || (w.number === best.week && di >= best.dayIdx)) {
+            best = { week: w.number, dayIdx: di, day: dayShort(d.name), sets: log.sets, name: log.name, source: "user" };
+          }
+        }
+        if (nameKey(ex.name) === target && (ex.sheetLogs || []).some((s) => s.value)) {
+          sheetHistory = { week: w.number, dayIdx: di, day: dayShort(d.name), sets: sheetSets(ex), name: ex.name, source: "sheet" };
         }
       });
     });
   }
-  return best;
+  return best || sheetHistory;
 }
 
 function beforeBreak(name, week) {
@@ -846,6 +859,61 @@ function lastShort(sets) {
   return parts.length ? parts.join(" → ") : "";
 }
 
+function previousSetText(set, ex) {
+  if (ex.unit === "sek") return set.reps ? `${set.reps} sekunder` : "Ingen tid registreret";
+  const weight = String(set.weight ?? "").trim();
+  const reps = String(set.reps ?? "").trim();
+  if (!weight && !reps) return "Ikke registreret";
+  return `${weight ? `${weight} kg` : "Vægt ikke registreret"}${reps ? ` × ${reps} reps` : " · reps ikke registreret"}`;
+}
+
+function previousSession(last, ex) {
+  if (!last) return '<section class="previous-session empty"><p>Ingen tidligere registrering af denne øvelse endnu.</p></section>';
+  const title = last.source === "sheet" ? "Fra dit gamle Excel-ark" : "Sidst registreret";
+  const recorded = last.sets.filter((set) => String(set.weight ?? "").trim() || String(set.reps ?? "").trim()).length;
+  const count = recorded === last.sets.length ? `${recorded} sæt` : `${recorded} af ${last.sets.length} sæt registreret`;
+  return `<section class="previous-session" aria-label="Tidligere træning">
+    <p class="previous-title">${title} · uge ${last.week} · ${escapeHtml(last.day)}</p>
+    <p class="previous-count">${count}</p>
+    <ol>${last.sets.map((set, i) => `<li><span>Sæt ${i + 1}</span><b>${escapeHtml(previousSetText(set, ex))}</b></li>`).join("")}</ol>
+  </section>`;
+}
+
+function abbreviationHelp(ex, chosen) {
+  const text = [chosen.name, ex.cue, ex.intensity, ex.reps].join(" ");
+  const terms = [["Reps", "Gentagelser. 4–6 reps betyder 4 til 6 gentagelser i hvert sæt."]];
+  if (ex.rir) {
+    let definition = "Gentagelser i reserve: 0 = ingen tilbage, 1 = én tilbage, 2 = to tilbage, 3 = tre tilbage. Stop, når du vurderer, at det angivne antal gentagelser er tilbage.";
+    if (/hack squat|smith machine bench press/i.test(chosen.name)) definition += " Ved denne øvelse skal du ved RIR 0 stoppe uden at forsøge og fejle næste gentagelse.";
+    terms.push(["RIR", definition]);
+  }
+  else terms.push(["RPE", "Hvor krævende sættet er på en skala til 10. RPE 10 = ingen gentagelser tilbage, 9 = cirka én tilbage, 8 = cirka to tilbage."]);
+  const definitions = [
+    [/\bDB\b/i, "DB", "Håndvægte (dumbbell)."],
+    [/\bBB\b/i, "BB", "Vægtstang (barbell)."],
+    [/\bEZ[- ]?Bar\b/i, "EZ-Bar", "Den bøjede vægtstang."],
+    [/\bRDL\b/i, "RDL", "Rumænsk dødløft. Se øvelsens video for udførelsen."],
+    [/\bROM\b/i, "ROM", "Bevægelsesudslag: hvor langt du bevæger vægten. Full ROM betyder hele det viste bevægelsesudslag."],
+    [/\bLLPs?\b|lengthened partials/i, "LLPs", "Delvise gentagelser i den del af bevægelsen, hvor musklen er strakt. Brug dem kun, når programmet angiver det."],
+    [/high[- ]rep/i, "High-rep set", "Et særskilt sæt med flere gentagelser og normalt lettere vægt. Log det separat fra de tunge sæt."],
+    [/\bWU\b/i, "WU", "Opvarmningssæt. De tæller ikke med som arbejdssæt."],
+    [/failure/i, "Failure", "Du kan ikke gennemføre endnu en hel gentagelse."],
+    [/~/, "~", "Cirka. Fx ~8–9 betyder omkring 8 til 9."],
+  ];
+  for (const [pattern, term, definition] of definitions) if (pattern.test(text)) terms.push([term, definition]);
+  if (ex.superset) terms.push([ex.superset, `Superset nr. ${ex.superset.replace(/\D/g, "")}: lav ét sæt af hver øvelse i parret, derefter pause. Gentag parret.`]);
+  return `<details class="abbreviation-help"><summary>Forkortelser i denne øvelse</summary><dl>${terms.map(([term, definition]) => `<dt>${escapeHtml(term)}</dt><dd>${escapeHtml(definition)}</dd>`).join("")}</dl></details>`;
+}
+
+function supersetHelp(week, dayIdx, ex) {
+  if (!ex.superset) return "";
+  const pairs = weekByNumber(week).days[dayIdx].exercises
+    .map((item, i) => ({ item, name: chosenOf(week, dayIdx, i, item).name }))
+    .filter(({ item }) => item.superset === ex.superset);
+  const rest = pairs.map(({ item }) => item.rest).find((value) => value && value !== "-");
+  return `<p class="technique">${escapeHtml(ex.superset)} = superset: ét sæt ${pairs.map(({ name }) => escapeHtml(name)).join(" → ét sæt ")} → ${escapeHtml(rest || "den angivne")} pause. Gentag parret.</p>`;
+}
+
 function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
   const log = getLog(week, dayIdx, exIdx);
   const done = Boolean(log?.done);
@@ -853,7 +921,9 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
   const alts = altsOf(ex);
   const sets = currentSets(week, dayIdx, exIdx, { ...ex, name: chosen.name });
   const last = lastForExercise(chosen.name, week, dayIdx, ex.repLabel);
-  const sidst = lastShort(last?.sets);
+  const sidst = last?.sets.map((set, i) => ({ set, i }))
+    .filter(({ set }) => String(set.weight ?? "").trim() || String(set.reps ?? "").trim())
+    .map(({ set, i }) => `Sæt ${i + 1}: ${previousSetText(set, ex)}`).join(" · ");
 
   const card = el(`<article class="ex-card ${done ? "done" : ""} ${isOpen ? "open" : ""}" data-key="${logKey(week, dayIdx, exIdx)}">
     <div class="ex-head">
@@ -861,7 +931,7 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
       <button class="ex-toggle" style="flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;color:inherit">
         <div class="ex-name">${escapeHtml(chosen.name)}</div>
         <div class="ex-meta">${sets.length} × ${escapeHtml(ex.reps)}</div>
-        ${sidst ? `<div class="last">${escapeHtml(sidst)}</div>` : ""}
+        ${sidst ? `<div class="last">${last.source === "sheet" ? "Ark" : "Sidst"} · uge ${last.week}: ${escapeHtml(sidst)}</div>` : ""}
       </button>
       ${alts.length > 1 ? `<button class="alt-btn" data-swap type="button" aria-label="Byt øvelse">⇄</button>` : ""}
       ${chosen.youtube ? `<a class="yt" href="${escapeHtml(chosen.youtube)}" target="_blank" rel="noopener" aria-label="Video">${ICONS.play}</a>` : ""}
@@ -870,11 +940,14 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
       <div class="exercise-plan">
         ${ex.repLabel ? `<p class="rep-label">${escapeHtml(ex.repLabel)}</p>` : ""}
         <p>Opvarmning: <b>${escapeHtml(ex.warmupSets || "0")} sæt</b> · Pause: <b>${ex.rest === "-" ? "direkte til næste øvelse" : escapeHtml(ex.rest)}</b></p>
-        ${ex.superset ? `<p class="technique">Superset ${escapeHtml(ex.superset)}: curl → skull crusher → pause. Skift efter hvert sæt.</p>` : ""}
+        ${supersetHelp(week, dayIdx, ex)}
         ${ex.intensity ? `<p class="technique">Teknik på sidste sæt: <b>${escapeHtml(ex.intensity)}</b></p>` : ""}
-        ${ex.rir ? '<p class="rir-help">RIR = gentagelser i reserve. 0 = ingen tilbage.</p>' : `<p>RPE: ${escapeHtml(ex.earlyRpe)} → ${escapeHtml(ex.lastRpe)}</p>`}
-        ${ex.cue ? `<details><summary>Teknik og vejledning</summary><p>${escapeHtml(ex.cue)}</p>${techniqueGuide(ex.intensity)}</details>` : ""}
+        ${ex.rir ? '<p class="rir-help">RIR = gentagelser i reserve. 0 = ingen tilbage, 1 = én tilbage, 2 = to tilbage.</p>' : `<p class="rir-help">RPE = hvor krævende sættet er (op til 10). 10 = ingen reps tilbage, 9 = én tilbage, 8 = to tilbage.</p><p>RPE-mål: ${escapeHtml(ex.earlyRpe)} → ${escapeHtml(ex.lastRpe)}</p>`}
+        ${techniqueGuide(ex.intensity)}
+        ${abbreviationHelp(ex, chosen)}
+        ${ex.cue ? `<details><summary>Teknik og vejledning</summary><p>${escapeHtml(ex.cue)}</p></details>` : ""}
       </div>
+      ${previousSession(last, ex)}
       <div class="sets"></div>
     </div>
   </article>`);
@@ -908,14 +981,15 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
     setsBox.appendChild(row);
   });
 
-  const persist = () => {
+  const persist = (userInput = true) => {
     const next = $$("[data-w]", setsBox).map((wEl, i) => ({
       weight: wEl.value.trim(),
       reps: setsBox.querySelector(`[data-r="${i}"]`)?.value.trim() || "",
       done: setsBox.querySelector(`[data-sd="${i}"]`)?.classList.contains("on") || false,
     }));
     const allDone = next.length > 0 && next.every((s) => s.done);
-    patchLog(week, dayIdx, exIdx, { name: chosen.name, sets: next, done: allDone, alt: Number(log?.alt || 0), source: "user" });
+    const source = userInput === false ? getLog(week, dayIdx, exIdx)?.source || "prefill" : "user";
+    patchLog(week, dayIdx, exIdx, { name: chosen.name, sets: next, done: allDone, alt: Number(log?.alt || 0), source });
     card.classList.toggle("done", allDone);
     const day = weekByNumber(week)?.days[dayIdx];
     if (day) {
@@ -949,9 +1023,9 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
   $("[data-swap]", card)?.addEventListener("click", (e) => {
     e.stopPropagation();
     const nextAlt = ((Number(log?.alt || 0) + 1) % alts.length);
-    persist();
+    persist(false);
     const current = getLog(week, dayIdx, exIdx);
-    const variants = { ...(current.variants || {}), [Number(log?.alt || 0)]: { sets: current.sets, done: current.done } };
+    const variants = { ...(current.variants || {}), [Number(log?.alt || 0)]: { sets: current.sets, done: current.done, source: current.source } };
     const restored = variants[nextAlt] || { sets: sheetSets(ex).map((s) => ({ ...s, weight: "", done: false })), done: false };
     patchLog(week, dayIdx, exIdx, { ...restored, variants, alt: nextAlt, name: alts[nextAlt].name });
     render();
@@ -1015,9 +1089,12 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
 function techniqueGuide(technique) {
   const t = String(technique || "").toLowerCase();
   let text = "";
-  if (t.includes("drop")) text = "Efter sættet: sænk vægten ca. 25%, fortsæt, og gentag vægtreduktionen én gang mere (3 dele i alt).";
-  else if (t.includes("myo")) text = "Efter failure: hvil 5 sekunder og forsøg 2 ekstra reps. Gentag, indtil du ikke kan gennemføre 2 hele reps.";
-  else if (t.includes("static")) text = "Efter sidste sæt: hold den nederste position under spænding i 30 sekunder.";
+  if (t.includes("llp") || t.includes("lengthened partial")) text = "Failure = ingen hele gentagelser tilbage. LLPs = fortsæt derefter med delvise gentagelser i musklens strakte position.";
+  else if (t.includes("drop")) text = "Drop set = efter sættet sænkes vægten ca. 25%. Fortsæt og gentag vægtreduktionen én gang mere (3 dele i alt).";
+  else if (t.includes("myo")) text = "Myo-reps = når du ikke kan tage endnu en hel gentagelse, hvil 5 sekunder og forsøg 2 ekstra reps. Gentag, indtil du ikke kan gennemføre 2 hele reps.";
+  else if (t.includes("static")) text = "Statisk hold/stræk = efter sidste sæt holdes den nederste position under spænding i 30 sekunder.";
+  else if (t.includes("failure")) text = "Failure = du kan ikke gennemføre endnu en hel gentagelse.";
+  else if (t === "n/a") text = "N/A = ingen ekstra intensitetsteknik i dette sæt.";
   return text ? `<p>${escapeHtml(text)}</p>` : "";
 }
 
