@@ -427,6 +427,7 @@ body.has-timer { padding-bottom: 88px; }
 }
 .set-grid {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 .set-col { display: grid; gap: 4px; min-width: 0; }
@@ -437,7 +438,8 @@ body.has-timer { padding-bottom: 88px; }
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
-.step { display: grid; gap: 4px; }
+.step { display: grid; gap: 4px; min-width: 0; }
+.step input { width: 100%; min-width: 0; }
 .step-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .nudge {
   min-height: 44px;
@@ -575,3 +577,36 @@ body.has-timer .toast { bottom: calc(100px + var(--safe-bot)); }
   font-weight: 700;
 }
 .seg button.on { background: var(--gold); color: #1a1406; border-color: transparent; }
+
+.program-picker {
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.program-picker label { display: block; margin-bottom: 8px; color: var(--gold-2); font-size: 13px; font-weight: 700; }
+.program-picker select {
+  width: 100%; min-height: 48px; padding: 10px;
+  color: var(--text); background: var(--bg-elev); border: 1px solid var(--line-strong);
+  border-radius: 10px; font: inherit; font-weight: 700;
+}
+.program-picker p { margin: 10px 0 4px; font-size: 14px; }
+.program-picker small, .program-progress, .program-caption { color: var(--muted); font-size: 13px; }
+.program-caption { margin: 0 0 10px; }
+.day-card .sub { display: block; padding: 0; margin-top: 4px; background: none; font-size: 13px; color: var(--muted); }
+.program-progress { margin: -4px 0 16px; }
+.program-guide { margin: 16px 0; padding: 12px 14px; background: var(--card); border-radius: 12px; }
+.program-guide summary, .exercise-plan summary { cursor: pointer; color: var(--gold-2); padding: 6px 0; }
+.program-guide p, .exercise-plan p, .session-note { font-size: 14px; line-height: 1.55; }
+.exercise-plan { padding: 2px 0 12px; overflow-wrap: anywhere; }
+.exercise-plan p { margin: 8px 0; }
+.exercise-plan .rir-help { color: var(--muted); font-size: 12px; }
+.technique, .rep-label { color: var(--gold-2); }
+.session-note { padding: 12px; border: 1px solid var(--line-strong); border-radius: 12px; color: var(--muted); }
+.set-lab { font-size: 13px; }
+button:focus-visible, a:focus-visible, summary:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+@media (min-width: 760px) {
+  #app { max-width: 760px; margin: 0 auto; }
+  .tabbar, .timer-dock { max-width: 736px; margin-left: auto; margin-right: auto; }
+}

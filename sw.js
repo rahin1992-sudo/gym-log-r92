@@ -1,59 +1,31 @@
-const CACHE = "bts-lift-v18";
+const CACHE = "bts-lift-v19";
 const ASSETS = [
-  "./",
-  "./index.html",
-  "./styles.css",
-  "./app.js",
-  "./styles.css?v=18",
-  "./app.js?v=18",
-  "./program.json",
-  "./pain.json",
-  "./manifest.webmanifest",
-  "./icon-180.png",
-  "./icon-192.png",
-  "./icon-512.png",
+  "./", "./index.html", "./styles.css?v=19", "./program-state.js?v=19", "./app.js?v=19",
+  "./program.json", "./program-min-max-phase2.json", "./pain.json",
+  "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png",
 ];
+const STATIC_URLS = new Set(ASSETS.map((path) => new URL(path, self.registration.scope).href));
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)));
-  self.skipWaiting();
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
+  event.waitUntil(caches.keys().then((keys) => Promise.all(
+    keys.filter((key) => key.startsWith("bts-lift-") && key !== CACHE).map((key) => caches.delete(key))
+  )).then(() => self.clients.claim()));
 });
 
 self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
   const url = new URL(event.request.url);
-  const live = /\.(js|css|html|webmanifest)$/.test(url.pathname) || url.pathname.endsWith("/") || url.search.includes("v=");
-  if (live) {
-    event.respondWith(
-      fetch(event.request)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((cache) => cache.put(event.request, copy));
-          return res;
-        })
-        .catch(() => caches.match(event.request))
-    );
-    return;
-  }
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const fresh = fetch(event.request)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((cache) => cache.put(event.request, copy));
-          return res;
-        })
-        .catch(() => cached);
-      return cached || fresh;
-    })
-  );
+  url.hash = "";
+  if (event.request.method !== "GET" || !STATIC_URLS.has(url.href)) return;
+  // Only the static app shell belongs in the offline cache. Backup APIs stay live.
+  event.respondWith(caches.open(CACHE).then(async (cache) => {
+    const cached = await cache.match(url.href);
+    if (cached) return cached;
+    const response = await fetch(event.request);
+    if (response.ok) await cache.put(event.request, response.clone());
+    return response;
+  }));
 });

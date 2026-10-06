@@ -7,6 +7,7 @@ const ICONS = {
 };
 
 let PROGRAM = null;
+let PROGRAMS = {};
 let PAIN = null;
 let state = null;
 let wakeLock = null;
@@ -18,14 +19,16 @@ const timer = {
   label: "",
   id: null,
   ringing: false,
+  deadline: 0,
   start(sec, label) {
     this.stopTick();
     this.remaining = sec;
     this.total = sec;
     this.label = label;
     this.ringing = false;
+    this.deadline = Date.now() + sec * 1000;
     this.id = setInterval(() => {
-      this.remaining -= 1;
+      this.remaining = Math.max(0, Math.ceil((this.deadline - Date.now()) / 1000));
       if (this.remaining <= 0) {
         this.remaining = 0;
         this.stopTick();
@@ -40,6 +43,7 @@ const timer = {
     if (!this.total && !this.remaining) return;
     this.remaining += sec;
     this.total += sec;
+    this.deadline += sec * 1000;
     this.ringing = false;
     if (!this.id && this.remaining > 0) this.start(this.remaining, this.label);
     paintTimer();
@@ -89,7 +93,7 @@ function setCount(ex) {
   return Math.max(base, logged);
 }
 function logKey(week, dayIdx, exIdx) {
-  return `w${week}|d${dayIdx}|e${exIdx}`;
+  return ProgramState.key(state.activeProgram, week, dayIdx, exIdx);
 }
 function nameKey(name) {
   return String(name || "").trim().toLowerCase();
@@ -105,15 +109,24 @@ function defaultPrefs() {
 
 function loadState() {
   let st = { week: 1, logs: {}, dismissedInstall: false, sheetImport: 0, prefs: defaultPrefs(), openKey: null, comeback: 0 };
+  let fresh = true;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) st = { ...st, ...JSON.parse(raw) };
+    if (raw) {
+      fresh = false;
+      const parsed = JSON.parse(raw);
+      st = { ...st, ...parsed };
+      if (!parsed.schemaVersion && !localStorage.getItem(`${STORAGE_KEY}-before-programs`)) {
+        try { localStorage.setItem(`${STORAGE_KEY}-before-programs`, raw); } catch {}
+      }
+    }
   } catch {}
   st.prefs = { ...defaultPrefs(), ...(st.prefs || {}) };
-  return applyComeback(st);
+  return ProgramState.normalize(st, fresh);
 }
 let saveTimer = null;
 function saveState() {
+  state.programWeeks[state.activeProgram] = state.week;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   try { navigator.storage?.persist?.(); } catch {}
   clearTimeout(saveTimer);
@@ -121,8 +134,7 @@ function saveState() {
 }
 
 function backupPayload() {
-  const { logs, wod, prefs, week, comeback } = state;
-  return JSON.stringify({ logs, wod, prefs, week, comeback, savedAt: new Date().toISOString() });
+  return JSON.stringify({ ...state, savedAt: new Date().toISOString() });
 }
 
 async function pushBackup() {
@@ -166,27 +178,10 @@ async function pullBackup() {
     } catch {}
   }
   if (!remote || typeof remote !== "object" || !remote.logs) return false;
-  state = {
-    ...state,
-    ...remote,
-    prefs: { ...defaultPrefs(), ...(state.prefs || {}), ...(remote.prefs || {}) },
-  };
+  try { state = ProgramState.mergeBackup(state, remote); } catch { return false; }
+  PROGRAM = PROGRAMS[state.activeProgram];
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   return true;
-}
-
-function applyComeback(st) {
-  if (st.comeback >= 1) return st;
-  const keep = {};
-  for (const [k, log] of Object.entries(st.logs || {})) {
-    if (!log || log.source === "sheet" || log.source === "prefill") continue;
-    keep[k] = { ...log, done: false, sets: (log.sets || []).map((s) => ({ ...s, done: false })) };
-  }
-  st.logs = keep;
-  st.week = 1;
-  st.comeback = 1;
-  st.sheetImport = 3;
-  return st;
 }
 
 function hasUserProgress() {
@@ -204,7 +199,7 @@ function patchLog(week, dayIdx, exIdx, patch) {
 
 function sheetSets(ex) {
   const n = setCount(ex);
-  const targetReps = ex.reps || "";
+  const targetReps = ex.rir ? "" : ex.reps || "";
   const sets = Array.from({ length: n }, () => ({ weight: "", reps: targetReps, done: false }));
   (ex.sheetLogs || []).forEach((s) => {
     const i = (s.set || 1) - 1;
@@ -219,7 +214,7 @@ function sheetSets(ex) {
 function currentSets(week, dayIdx, exIdx, ex) {
   const n = setCount(ex);
   const log = getLog(week, dayIdx, exIdx);
-  const last = lastForExercise(ex.name, week, dayIdx);
+  const last = lastForExercise(ex.name, week, dayIdx, ex.repLabel);
   const base = log?.sets?.length
     ? Array.from({ length: n }, (_, i) => ({
       weight: log.sets[i]?.weight || "",
@@ -229,21 +224,22 @@ function currentSets(week, dayIdx, exIdx, ex) {
     : sheetSets(ex);
   return base.map((s, i) => ({
     weight: s.weight || last?.sets?.[i]?.weight || last?.sets?.find((x) => x.weight)?.weight || "",
-    reps: s.reps || ex.reps || last?.sets?.[i]?.reps || "",
+    reps: s.reps || (ex.rir ? "" : ex.reps) || "",
     done: Boolean(s.done),
   }));
 }
 
-function lastForExercise(name, week, dayIdx) {
+function lastForExercise(name, week, dayIdx, repLabel) {
   const target = nameKey(name);
   let best = null;
   for (const w of allWeeks()) {
     w.days.forEach((d, di) => {
       d.exercises.forEach((ex, ei) => {
-        if (nameKey(ex.name) !== target) return;
+        if ((ex.repLabel || "") !== (repLabel || "")) return;
+        const user = getLog(w.number, di, ei);
+        if (nameKey(user?.name || ex.name) !== target) return;
         const earlier = w.number < week || (w.number === week && di < dayIdx);
         if (!earlier) return;
-        const user = getLog(w.number, di, ei);
         const sets = user?.sets?.some((s) => s.weight) ? user.sets : sheetSets(ex);
         if (!sets.some((s) => s.weight)) return;
         if (!best || w.number > best.week || (w.number === best.week && di > best.dayIdx)) {
@@ -346,14 +342,7 @@ function warmupLoads(ex, working) {
 }
 
 function restSeconds(rest) {
-  const m = String(rest || "").match(/(\d+)\s*(?:-\s*(\d+))?/);
-  if (!m) return 90;
-  const a = parseInt(m[1], 10) * 60;
-  const b = m[2] ? parseInt(m[2], 10) * 60 : a;
-  const bias = state.prefs.restBias;
-  if (bias === "high") return b;
-  if (bias === "mid") return Math.round((a + b) / 2);
-  return a;
+  return ProgramState.restSeconds(rest, state.prefs.restBias);
 }
 
 function dayProgress(week, dayIdx, day) {
@@ -361,8 +350,8 @@ function dayProgress(week, dayIdx, day) {
     const done = Boolean(state.logs[logKey(week, dayIdx, "rest")]?.done);
     return { done: done ? 1 : 0, total: 1, rest: true };
   }
-  const total = day.exercises.length;
-  const done = day.exercises.filter((_, i) => getLog(week, dayIdx, i)?.done).length;
+  const total = day.exercises.filter((ex) => !ex.optional).length;
+  const done = day.exercises.filter((ex, i) => !ex.optional && getLog(week, dayIdx, i)?.done).length;
   return { done, total, rest: false };
 }
 
@@ -370,7 +359,7 @@ function weekProgress(weekObj) {
   let done = 0;
   let total = 0;
   weekObj.days.forEach((d, i) => {
-    if (d.type === "rest") return;
+    if (d.type === "rest" || d.optional) return;
     const p = dayProgress(weekObj.number, i, d);
     done += p.done;
     total += p.total;
@@ -382,7 +371,7 @@ function lastStartedWeek() {
   let n = 1;
   for (const w of allWeeks()) {
     const started = w.days.some((d, di) =>
-      d.exercises.some((_, ei) => Boolean(getLog(w.number, di, ei)?.done))
+      !d.optional && d.exercises.some((_, ei) => Boolean(getLog(w.number, di, ei)?.done))
     );
     if (started) n = w.number;
   }
@@ -395,7 +384,7 @@ function nextIncomplete() {
     if (w.number < start) continue;
     for (let i = 0; i < w.days.length; i++) {
       const d = w.days[i];
-      if (d.type === "rest") continue;
+      if (d.type === "rest" || d.optional) continue;
       const p = dayProgress(w.number, i, d);
       if (p.done < p.total) return { week: w, day: d, dayIdx: i, progress: p };
     }
@@ -498,6 +487,11 @@ function chosenOf(week, dayIdx, exIdx, ex) {
 function parseHash() {
   const h = (location.hash || "#/").replace(/^#/, "");
   const parts = h.split("/").filter(Boolean);
+  if (parts[0] === "p") {
+    const id = parts[1];
+    if (PROGRAMS[id] && id !== state.activeProgram) selectProgram(id, false);
+    parts.splice(0, 2);
+  }
   if (parts[0] === "warmup") return { view: "warmup" };
   if (parts[0] === "settings") return { view: "settings" };
   if (parts[0] === "abs" && parts[1] === "wod") return { view: "wod" };
@@ -518,12 +512,36 @@ function parseHash() {
 
 function go(path) {
   const next = String(path || "").replace(/^#/, "");
-  const normalized = next.startsWith("/") ? next : `/${next}`;
+  const pathPart = next.startsWith("/") ? next : `/${next}`;
+  const normalized = pathPart.startsWith("/p/") ? pathPart : `/p/${state.activeProgram}${pathPart}`;
   if (location.hash === `#${normalized}`) {
     render();
     return;
   }
   location.hash = normalized;
+}
+
+function selectProgram(id, navigate = true) {
+  if (!PROGRAMS[id]) return;
+  state.programWeeks[state.activeProgram] = state.week;
+  state.activeProgram = id;
+  PROGRAM = PROGRAMS[id];
+  state.week = state.programWeeks[id] || 1;
+  state.openKey = null;
+  timer.skip();
+  saveState();
+  if (navigate) go(`/w/${state.week}`);
+}
+
+function programPicker() {
+  const box = el(`<section class="program-picker">
+    <label for="program-select">Træningsprogram</label>
+    <select id="program-select" aria-label="Træningsprogram">${Object.entries(PROGRAMS).map(([id, p]) => `<option value="${id}" ${state.activeProgram === id ? "selected" : ""}>${escapeHtml(p.shortTitle)}</option>`).join("")}</select>
+    <p>${escapeHtml(PROGRAM.description)}</p>
+    <small>Hvert program husker dine vægte og din uge.</small>
+  </section>`);
+  $("select", box).addEventListener("change", (e) => selectProgram(e.target.value));
+  return box;
 }
 
 function toast(msg) {
@@ -583,7 +601,7 @@ function paintTimer() {
 
 function render() {
   const route = parseHash();
-  if (route.week) {
+  if (route.week && weekByNumber(route.week)) {
     state.week = route.week;
     saveState();
   }
@@ -624,7 +642,7 @@ function render() {
     const open = $(".ex-card.open");
     if (open) open.scrollIntoView({ block: "nearest", behavior: "auto" });
     else window.scrollTo(0, y);
-  }
+  } else window.scrollTo(0, 0);
 }
 
 function bottomNav(active) {
@@ -662,11 +680,19 @@ function viewHome(weekNum) {
         <div class="chev">›</div>
       </button>
       <div class="week-pills"></div>
-      <h2 class="week-title">Uge ${week.number}</h2>
+      <h2 class="week-title">Uge ${week.number}${week.phase ? ` · ${escapeHtml(week.phase)}` : ""}</h2>
       <div class="day-list"></div>
     </div>
   </div>`);
   wrap.prepend(topbar("Træning"));
+  $(".page", wrap).prepend(programPicker());
+  const progress = weekProgress(week);
+  $(".week-title", wrap).after(el(`<p class="program-progress">${progress.done}/${progress.total} øvelser i hovedprogrammet · ${escapeHtml(week.block)}</p>`));
+  const guidance = el(`<details class="program-guide"><summary>Programguide og opvarmning</summary>
+    ${(PROGRAM.guide || []).map((text) => `<p>${escapeHtml(text)}</p>`).join("")}
+    <button class="btn" data-warmup>Se opvarmning</button></details>`);
+  $("[data-warmup]", guidance).addEventListener("click", () => go("/warmup"));
+  $(".week-pills", wrap).before(guidance);
   $("[data-abs]", wrap).addEventListener("click", () => go("/abs"));
 
   const pills = $(".week-pills", wrap);
@@ -688,8 +714,8 @@ function viewHome(weekNum) {
     const card = el(`<button class="day-card ${complete ? "done" : ""} ${day.type === "rest" ? "rest" : ""}" type="button">
       <div class="day-mark">${day.type === "rest" ? "R" : workoutNo}</div>
       <div>
-        <div class="title">${escapeHtml(dayShort(day.name))}</div>
-        <div class="sub">${day.type === "rest" ? "Hvile" : `${p.done}/${p.total}`}</div>
+        <div class="title">${escapeHtml(dayShort(day.name))}${day.optional ? " · valgfri" : ""}</div>
+        <div class="sub">${day.type === "rest" ? escapeHtml(day.note || "Hvile") : `${p.done}/${p.total} øvelser`}</div>
       </div>
       <div class="chev">›</div>
     </button>`);
@@ -739,6 +765,11 @@ function renderSearch(q, box) {
 function advanceAfterExercise(week, dayIdx, exIdx) {
   const w = weekByNumber(week);
   const day = w?.days[dayIdx];
+  if (day?.optional && dayProgress(week, dayIdx, day).done === dayProgress(week, dayIdx, day).total) {
+    toast("Ekstra pas færdigt");
+    go(`/w/${week}`);
+    return;
+  }
   if (day && exIdx + 1 < day.exercises.length) {
     go(`/w/${week}/d/${dayIdx}/e/${exIdx + 1}`);
     return;
@@ -768,6 +799,7 @@ function viewWorkout(weekNum, dayIdx, openIdx) {
       <div class="page rest-page">
         <div class="day-mark" style="margin:0 auto 12px;width:64px;height:64px;font-size:22px">R</div>
         <h2>Hvile</h2>
+        <p>${escapeHtml(day.note || "")}</p>
         <button class="btn ${done ? "" : "primary"}" data-rest>${done ? "Fjern" : "Færdig"}</button>
       </div>
     </div>`);
@@ -795,9 +827,11 @@ function viewWorkout(weekNum, dayIdx, openIdx) {
   const wrap = el(`<div>
     <div class="page workout">
       <div class="progress-wrap">
+        <p class="program-caption">${escapeHtml(PROGRAM.shortTitle)}${week.phase ? ` · ${escapeHtml(week.phase)}` : ""}</p>
         <div class="progress-meta"><span>${escapeHtml(dayShort(day.name))}</span><span>${p.done}/${p.total}</span></div>
         <div class="bar"><span style="width:${p.total ? (p.done / p.total) * 100 : 0}%"></span></div>
       </div>
+      ${day.note ? `<p class="session-note">${escapeHtml(day.note)}</p>` : ""}
       <div class="ex-list"></div>
     </div>
   </div>`);
@@ -818,7 +852,7 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
   const chosen = chosenOf(week, dayIdx, exIdx, ex);
   const alts = altsOf(ex);
   const sets = currentSets(week, dayIdx, exIdx, { ...ex, name: chosen.name });
-  const last = lastForExercise(chosen.name, week, dayIdx);
+  const last = lastForExercise(chosen.name, week, dayIdx, ex.repLabel);
   const sidst = lastShort(last?.sets);
 
   const card = el(`<article class="ex-card ${done ? "done" : ""} ${isOpen ? "open" : ""}" data-key="${logKey(week, dayIdx, exIdx)}">
@@ -833,6 +867,14 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
       ${chosen.youtube ? `<a class="yt" href="${escapeHtml(chosen.youtube)}" target="_blank" rel="noopener" aria-label="Video">${ICONS.play}</a>` : ""}
     </div>
     <div class="ex-body">
+      <div class="exercise-plan">
+        ${ex.repLabel ? `<p class="rep-label">${escapeHtml(ex.repLabel)}</p>` : ""}
+        <p>Opvarmning: <b>${escapeHtml(ex.warmupSets || "0")} sæt</b> · Pause: <b>${ex.rest === "-" ? "direkte til næste øvelse" : escapeHtml(ex.rest)}</b></p>
+        ${ex.superset ? `<p class="technique">Superset ${escapeHtml(ex.superset)}: curl → skull crusher → pause. Skift efter hvert sæt.</p>` : ""}
+        ${ex.intensity ? `<p class="technique">Teknik på sidste sæt: <b>${escapeHtml(ex.intensity)}</b></p>` : ""}
+        ${ex.rir ? '<p class="rir-help">RIR = gentagelser i reserve. 0 = ingen tilbage.</p>' : `<p>RPE: ${escapeHtml(ex.earlyRpe)} → ${escapeHtml(ex.lastRpe)}</p>`}
+        ${ex.cue ? `<details><summary>Teknik og vejledning</summary><p>${escapeHtml(ex.cue)}</p>${techniqueGuide(ex.intensity)}</details>` : ""}
+      </div>
       <div class="sets"></div>
     </div>
   </article>`);
@@ -842,20 +884,20 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
     const row = el(`<div class="set-row ${s.done ? "done" : ""}">
       <div class="set-top">
         <button class="set-check ${s.done ? "on" : ""}" data-sd="${i}" aria-label="Sæt lavet">${ICONS.check}</button>
-        <div class="set-lab">${i + 1}</div>
+        <div class="set-lab">Sæt ${i + 1}${ex.rir?.[i] != null ? ` · RIR ${escapeHtml(ex.rir[i])}` : ""}${ex.intensity && i === sets.length - 1 ? " · + teknik" : ""}</div>
       </div>
       <div class="set-grid">
         <div class="step">
           <span>Kg</span>
-          <input class="field" inputmode="decimal" value="${escapeHtml(s.weight)}" data-w="${i}" />
+          <input class="field" aria-label="Kg, sæt ${i + 1}" inputmode="decimal" value="${escapeHtml(s.weight)}" data-w="${i}" />
           <div class="step-row">
             <button class="nudge" data-b="${i}" data-d="-1.25">−</button>
             <button class="nudge" data-b="${i}" data-d="1.25">+</button>
           </div>
         </div>
         <div class="step">
-          <span>Reps</span>
-          <input class="field" inputmode="decimal" placeholder="${escapeHtml(ex.reps || "")}" value="${escapeHtml(s.reps)}" data-r="${i}" />
+          <span>${ex.unit === "sek" ? "Sekunder" : "Reps"}</span>
+          <input class="field" aria-label="${ex.unit === "sek" ? "Sekunder" : "Reps"}, sæt ${i + 1}" inputmode="decimal" placeholder="${escapeHtml(ex.reps || "")}" value="${escapeHtml(s.reps)}" data-r="${i}" />
           <div class="step-row">
             <button class="nudge" data-rb="${i}" data-d="-1">−</button>
             <button class="nudge" data-rb="${i}" data-d="1">+</button>
@@ -873,7 +915,7 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
       done: setsBox.querySelector(`[data-sd="${i}"]`)?.classList.contains("on") || false,
     }));
     const allDone = next.length > 0 && next.every((s) => s.done);
-    patchLog(week, dayIdx, exIdx, { name: chosen.name, sets: next, done: allDone, alt: Number(log?.alt || 0) });
+    patchLog(week, dayIdx, exIdx, { name: chosen.name, sets: next, done: allDone, alt: Number(log?.alt || 0), source: "user" });
     card.classList.toggle("done", allDone);
     const day = weekByNumber(week)?.days[dayIdx];
     if (day) {
@@ -908,7 +950,10 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
     e.stopPropagation();
     const nextAlt = ((Number(log?.alt || 0) + 1) % alts.length);
     persist();
-    patchLog(week, dayIdx, exIdx, { alt: nextAlt, name: alts[nextAlt].name });
+    const current = getLog(week, dayIdx, exIdx);
+    const variants = { ...(current.variants || {}), [Number(log?.alt || 0)]: { sets: current.sets, done: current.done } };
+    const restored = variants[nextAlt] || { sets: sheetSets(ex).map((s) => ({ ...s, weight: "", done: false })), done: false };
+    patchLog(week, dayIdx, exIdx, { ...restored, variants, alt: nextAlt, name: alts[nextAlt].name });
     render();
   });
 
@@ -919,7 +964,20 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
       const next = persist();
       if (btn.classList.contains("on")) {
         buzz(40);
-        timer.start(restSeconds(ex.rest), ex.name);
+        const seconds = restSeconds(ex.rest);
+        if (seconds > 0) timer.start(seconds, chosen.name);
+        else timer.skip();
+        if (ex.superset) {
+          const day = weekByNumber(week).days[dayIdx];
+          const pair = day.exercises.map((e, index) => ({ e, index })).filter(({ e }) => e.superset === ex.superset);
+          const other = pair.find(({ index }) => index !== exIdx);
+          if (other && !getLog(week, dayIdx, other.index)?.sets?.[Number(btn.dataset.sd)]?.done) {
+            go(`/w/${week}/d/${dayIdx}/e/${other.index}`);
+            return;
+          }
+          const pending = pair.find(({ index }) => !getLog(week, dayIdx, index)?.done);
+          if (pending) { go(`/w/${week}/d/${dayIdx}/e/${pending.index}`); return; }
+        }
       }
       if (next.every((s) => s.done)) {
         toast("Øvelse færdig");
@@ -932,8 +990,8 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
     e.stopPropagation();
     persist();
     const now = !getLog(week, dayIdx, exIdx)?.done;
-    const next = currentSets(week, dayIdx, exIdx, ex).map((s) => ({ ...s, done: now }));
-    patchLog(week, dayIdx, exIdx, { done: now, name: ex.name, sets: next });
+    const next = currentSets(week, dayIdx, exIdx, { ...ex, name: chosen.name }).map((s) => ({ ...s, done: now }));
+    patchLog(week, dayIdx, exIdx, { done: now, name: chosen.name, sets: next, source: "user" });
     buzz(now ? 50 : 20);
     if (now) {
       toast("Øvelse streget af");
@@ -952,6 +1010,15 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
   }
 
   return card;
+}
+
+function techniqueGuide(technique) {
+  const t = String(technique || "").toLowerCase();
+  let text = "";
+  if (t.includes("drop")) text = "Efter sættet: sænk vægten ca. 25%, fortsæt, og gentag vægtreduktionen én gang mere (3 dele i alt).";
+  else if (t.includes("myo")) text = "Efter failure: hvil 5 sekunder og forsøg 2 ekstra reps. Gentag, indtil du ikke kan gennemføre 2 hele reps.";
+  else if (t.includes("static")) text = "Efter sidste sæt: hold den nederste position under spænding i 30 sekunder.";
+  return text ? `<p>${escapeHtml(text)}</p>` : "";
 }
 
 function viewPain() {
@@ -1120,7 +1187,7 @@ function viewSettings() {
     </div>
     <p>Kort = 1 min ved “1–2 min”, lang = 2 min.</p>
     <h2>Backup</h2>
-    <p>Gemmes automatisk på telefonen. Når du er online, også på computeren (OneDrive-mappen BTS-Lift) og i skyen.</p>
+    <p>Begge programmer gemmes automatisk på denne enhed. Filbackup indeholder al historik. Skybackup forsøges, når du er online; computerbackup kræver den lokale server.</p>
     <p>${p.lastPcSync ? "Computer: " + p.lastPcSync.slice(0, 16).replace("T", " ") : "Computer: venter på første gem"}</p>
     <p>${p.lastCloudSync ? "Sky: " + p.lastCloudSync.slice(0, 16).replace("T", " ") : "Sky: venter på første gem"}</p>
     ${p.cloudId ? `<p>Kode: <b>${escapeHtml(p.cloudId)}</b></p>` : ""}
@@ -1130,10 +1197,10 @@ function viewSettings() {
     </div>
     <button class="btn full" data-cloud style="margin-top:8px">Gendan fra sky / computer</button>
     <h2>Data</h2>
-    <button class="btn full" data-reimport>Hent kg/reps fra Excel-arket igen</button>
-    <button class="btn full" data-reset style="margin-top:8px">Nulstil mine logs</button>
+    <button class="btn full" data-reset style="margin-top:8px">Nulstil kun ${escapeHtml(PROGRAM.shortTitle)}</button>
   </div></div>`);
   wrap.prepend(topbar("Indstillinger", `/w/${state.week}`));
+  $(".page", wrap).prepend(programPicker());
   $("[data-awake]", wrap).addEventListener("change", (e) => {
     state.prefs.keepAwake = e.target.checked;
     saveState();
@@ -1155,6 +1222,7 @@ function viewSettings() {
     a.href = URL.createObjectURL(blob);
     a.download = `bts-lift-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   });
   $("input[type=file]", wrap).addEventListener("change", async (e) => {
     const file = e.target.files?.[0];
@@ -1162,10 +1230,11 @@ function viewSettings() {
     try {
       const data = JSON.parse(await file.text());
       if (!data || typeof data !== "object" || !data.logs) throw new Error("Ugyldig fil");
-      state = { ...loadState(), ...data, prefs: { ...defaultPrefs(), ...(data.prefs || {}) } };
+      state = ProgramState.mergeBackup(state, data);
+      PROGRAM = PROGRAMS[state.activeProgram];
       saveState();
       toast("Backup indlæst");
-      render();
+      go("/settings");
     } catch {
       toast("Kunne ikke læse filen");
     }
@@ -1173,16 +1242,12 @@ function viewSettings() {
   $("[data-cloud]", wrap).addEventListener("click", async () => {
     const ok = await pullBackup();
     toast(ok ? "Gendannet" : "Ingen backup fundet");
-    if (ok) render();
-  });
-  $("[data-reimport]", wrap).addEventListener("click", () => {
-    toast("Dine gamle ark-kg ligger allerede som historik. Start i uge 1.");
+    if (ok) { saveState(); go("/settings"); }
   });
   $("[data-reset]", wrap).addEventListener("click", () => {
-    if (!confirm("Slet alle dine afstregninger og indtastede vægte?")) return;
-    state.logs = {};
-    state.comeback = 0;
-    state = applyComeback(state);
+    if (!confirm(`Nulstil logs i ${PROGRAM.shortTitle}? Det andet program bevares. Gem gerne en filbackup først.`)) return;
+    state.logs = Object.fromEntries(Object.entries(state.logs).filter(([key]) => !ProgramState.belongsTo(key, state.activeProgram)));
+    state.week = 1;
     saveState();
     toast("Nulstillet. Du starter i uge 1.");
     go("/w/1");
@@ -1221,16 +1286,25 @@ document.addEventListener("visibilitychange", () => {
 
 async function boot() {
   try {
-    PROGRAM = await (await fetch("program.json")).json();
+    const [legacy, phase2] = await Promise.all(["program.json", "program-min-max-phase2.json"].map(async (file) => {
+      const response = await fetch(file);
+      if (!response.ok) throw new Error(file);
+      return response.json();
+    }));
+    PROGRAMS = {
+      bts: { ...legacy, id: "bts", shortTitle: "BTS · dit gamle program", description: "12 uger · dit eksisterende træningsprogram" },
+      "min-max-phase-2": phase2,
+    };
     try { PAIN = await (await fetch("pain.json")).json(); } catch { PAIN = { days: [], groups: {} }; }
   } catch {
-    $("#app").innerHTML = '<div class="boot">Kunne ikke indlæse program.json. Åbn appen via serveren, ikke som fil.</div>';
+    $("#app").innerHTML = '<div class="boot">Kunne ikke indlæse programmerne. Åbn appen online og prøv igen.</div>';
     return;
   }
   state = loadState();
+  PROGRAM = PROGRAMS[state.activeProgram];
   window.addEventListener("hashchange", render);
   if (!location.hash) {
-    location.hash = "/w/1";
+    go(`/w/${state.week}`);
   } else {
     render();
   }

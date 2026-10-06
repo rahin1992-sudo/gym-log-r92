@@ -1,0 +1,124 @@
+const {chromium} = require('playwright');
+const http = require('node:http');
+const fs = require('node:fs');
+const path = require('node:path');
+const assert = require('node:assert/strict');
+const root = path.resolve(__dirname,'..');
+const types={'.html':'text/html','.js':'text/javascript','.json':'application/json','.css':'text/css','.png':'image/png','.webmanifest':'application/manifest+json'};
+const server=http.createServer((req,res)=>{
+  const url=new URL(req.url,'http://localhost');
+  const file=path.resolve(root,'.'+(url.pathname==='/'?'/index.html':url.pathname));
+  if(req.method!=='GET'||!file.startsWith(root+path.sep)||!fs.existsSync(file)){res.writeHead(404);res.end();return;}
+  res.setHeader('Content-Type',types[path.extname(file)]||'application/octet-stream');
+  res.end(fs.readFileSync(file));
+});
+
+(async()=>{
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const base=`http://127.0.0.1:${server.address().port}`;
+  const browser=await chromium.launch({headless:true, ...(process.env.BROWSER_CHANNEL ? {channel:process.env.BROWSER_CHANNEL} : {})});
+  try {
+    const context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:1});
+    // Test logs must never be sent to the production backup service.
+    await context.route(/https:\/\//,route=>route.abort());
+    await context.addInitScript(()=>{
+      if(!localStorage.getItem('bts-lift-v1'))localStorage.setItem('bts-lift-v1',JSON.stringify({week:8,comeback:0,logs:{'w8|d0|e0':{name:'Old lift',done:true,sets:[{weight:'80',reps:'8',done:true}],updatedAt:'2026-10-01T00:00:00Z'}},prefs:{}}));
+    });
+    const page=await context.newPage();
+    const errors=[];page.on('pageerror',err=>errors.push(err.message));
+    await page.goto(base);
+    await page.locator('#program-select').waitFor();
+    assert.equal(await page.locator('#program-select').inputValue(),'bts');
+    assert.match(await page.locator('.week-title').textContent(),/Uge 8/);
+    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('bts-lift-v1')).logs['w8|d0|e0'].done),true);
+    assert.ok(await page.evaluate(()=>localStorage.getItem('bts-lift-v1-before-programs')));
+    await page.locator('#program-select').selectOption('min-max-phase-2');
+    await page.waitForURL('**/#/p/min-max-phase-2/w/1');
+    assert.equal(await page.locator('.week-pill').count(),12);
+    assert.equal(await page.locator('.day-list .day-card').count(),7);
+    if(process.env.SHOT_DIR)await page.screenshot({path:path.join(process.env.SHOT_DIR,'home-mobile.png'),fullPage:true});
+    await page.locator('.day-list .day-card').first().click();
+    await page.locator('.ex-card.open [data-w="0"]').fill('60');
+    await page.locator('.ex-card.open [data-r="0"]').fill('6');
+    assert.match(await page.locator('.ex-card.open .set-lab').first().textContent(),/RIR 1/);
+    // Swapping movements never reuses their weights; switching back restores them.
+    await page.locator('.ex-card.open [data-swap]').click();
+    assert.equal(await page.locator('.ex-card.open [data-w="0"]').inputValue(),'');
+    await page.locator('.ex-card.open [data-w="0"]').fill('45');
+    await page.locator('.ex-card.open [data-swap]').click();
+    await page.locator('.ex-card.open [data-swap]').click();
+    assert.equal(await page.locator('.ex-card.open [data-w="0"]').inputValue(),'60');
+    if(process.env.SHOT_DIR)await page.screenshot({path:path.join(process.env.SHOT_DIR,'workout-mobile.png'),fullPage:true});
+    // Superset switches after each set and the timer uses seconds.
+    await page.goto(base+'/#/p/min-max-phase-2/w/1/d/0/e/7');
+    await page.locator('.ex-card.open [data-sd="0"]').click();
+    await page.waitForURL('**/e/8');
+    await page.locator('.ex-card.open [data-sd="0"]').click();
+    await page.waitForURL('**/e/7');
+    assert.equal(await page.evaluate(()=>timer.total),30);
+    await page.locator('.ex-card.open [data-sd="1"]').click();
+    await page.waitForURL('**/e/8');
+    await page.locator('.ex-card.open [data-sd="1"]').click();
+    await page.goto(base+'/#/p/min-max-phase-2/w/9');
+    await page.locator('#program-select').selectOption('bts');
+    await page.waitForURL('**/#/p/bts/w/8');
+    await page.locator('#program-select').selectOption('min-max-phase-2');
+    await page.waitForURL('**/#/p/min-max-phase-2/w/9');
+    await page.reload();
+    await page.locator('#program-select').waitFor();
+    const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('bts-lift-v1')));
+    assert.equal(saved.logs['w8|d0|e0'].sets[0].weight,'80');
+    assert.equal(saved.logs['min-max-phase-2|w1|d0|e0'].sets[0].weight,'60');
+    // Backup file restore works for both old and new payloads without clearing either program.
+    await page.goto(base+'/#/p/min-max-phase-2/settings');
+    await page.locator('input[type=file]').setInputFiles({name:'legacy.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({week:3,logs:{'w3|d0|e0':{done:true,sets:[{weight:'77'}]}}}))});
+    await page.waitForURL('**/#/p/bts/settings');
+    assert.equal(await page.evaluate(()=>state.logs['min-max-phase-2|w1|d0|e0'].sets[0].weight),'60');
+    // Reset affects only the selected program.
+    page.once('dialog',dialog=>dialog.accept());
+    await page.locator('[data-reset]').click();
+    await page.waitForURL('**/#/p/bts/w/1');
+    assert.equal(await page.evaluate(()=>Object.keys(state.logs).filter(k=>/^w\d/.test(k)).length),0);
+    assert.equal(await page.evaluate(()=>state.logs['min-max-phase-2|w1|d0|e0'].sets[0].weight),'60');
+    await page.evaluate(()=>navigator.serviceWorker.ready);
+    await page.reload();
+    await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
+    await context.setOffline(true);
+    await page.reload();
+    await page.locator('#program-select').waitFor();
+    await page.locator('#program-select').selectOption('min-max-phase-2');
+    await page.waitForURL('**/#/p/min-max-phase-2/w/9');
+    await page.locator('.week-pill').last().click();
+    await page.waitForFunction(()=>document.querySelector('.week-title')?.textContent.includes('Uge 12'));
+    assert.match(await page.locator('.week-title').textContent(),/Uge 12/);
+    await page.locator('.day-list .day-card').last().click();
+    await page.locator('.session-note').waitFor();
+    assert.equal(await page.locator('.ex-card').count(),9);
+    assert.match(await page.locator('.session-note').textContent(),/kun uge 1/);
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    assert.deepEqual(errors,[]);
+    await context.setOffline(false);
+    await page.setViewportSize({width:320,height:740});
+    await page.goto(base+'/#/p/min-max-phase-2/w/8/d/0/e/7');
+    await page.locator('.ex-card.open').waitFor();
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    await page.setViewportSize({width:1280,height:900});
+    await page.goto(base+'/#/p/min-max-phase-2/w/8');
+    await page.locator('#program-select').waitFor();
+    await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+    if(process.env.SHOT_DIR)await page.screenshot({path:path.join(process.env.SHOT_DIR,'home-desktop.png'),fullPage:true});
+    const fresh=await browser.newContext();
+    await fresh.route(/https:\/\//,route=>route.abort());
+    const freshPage=await fresh.newPage();
+    await freshPage.goto(base);
+    await freshPage.locator('#program-select').waitFor();
+    assert.equal(await freshPage.locator('#program-select').inputValue(),'min-max-phase-2');
+    await freshPage.goto(base+'/#/p/min-max-phase-2/settings');
+    await freshPage.locator('input[type=file]').setInputFiles({name:'all-programs.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(saved))});
+    await freshPage.waitForFunction(()=>state.logs['min-max-phase-2|w1|d0|e0']?.sets[0].weight==='60');
+    assert.equal(await freshPage.evaluate(()=>state.logs['w8|d0|e0'].sets[0].weight),'80');
+    await fresh.close();
+    console.log('PASS: migration, program switching, separate logs, alternatives, supersets, backup restore, scoped reset, mobile layout and offline access.');
+    await context.close();
+  } finally {await browser.close();server.close();}
+})().catch(err=>{console.error(err);server.close();process.exitCode=1;});

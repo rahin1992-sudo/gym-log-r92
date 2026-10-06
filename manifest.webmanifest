@@ -1,7 +1,7 @@
 {
   "name": "BTS Lift",
   "short_name": "BTS Lift",
-  "description": "Bodybuilding Transformation System — log vægt og streg øvelser af",
+  "description": "BTS og Min-Max Phase 2 — vælg program, log vægte og følg din fremgang",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
