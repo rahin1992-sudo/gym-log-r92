@@ -3,6 +3,8 @@ const ICONS = {
   back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>',
   play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.14v13.72L19.26 12 8 5.14z"/></svg>',
   check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 12.5l4.2 4.2L19 7.5"/></svg>',
+  swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h15m-4-4 4 4-4 4M20 17H5m4-4-4 4 4 4"/></svg>',
+  forward: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>',
   gear: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M4.6 15.2l1.6-.5m11.6-5.4l1.6-.5M8.4 4.8l.5 1.6m5.4 11.6l.5 1.6M4.8 8.4l1.6.5m11.6 5.4l1.6.5M15.2 4.6l-.5 1.6m-5.4 11.6l-.5 1.6"/></svg>',
 };
 
@@ -593,8 +595,8 @@ function paintTimer() {
       <div class="timer-time">0:00</div>
       <div class="timer-lab"><div class="a">Pause</div><div class="b"></div></div>
       <div class="timer-acts">
-        <button data-plus>+30s</button>
-        <button data-skip>Skip</button>
+        <button data-plus aria-label="Forlæng pausen med 30 sekunder">+30 sek.</button>
+        <button data-skip>Afslut pause</button>
       </div>
     </div>`);
     document.body.appendChild(dock);
@@ -653,9 +655,14 @@ function render() {
   }
   if (route.view === "workout") {
     const open = $(".ex-card.open");
-    if (open) open.scrollIntoView({ block: "nearest", behavior: "auto" });
+    if (open) open.scrollIntoView({ block: "start", behavior: "auto" });
     else window.scrollTo(0, y);
-  } else window.scrollTo(0, 0);
+  } else {
+    const rail = $(".week-pills");
+    const selected = $(".week-pill.on");
+    if (rail && selected) rail.scrollLeft = selected.offsetLeft - rail.offsetLeft - (rail.clientWidth - selected.clientWidth) / 2;
+    window.scrollTo(0, 0);
+  }
 }
 
 function bottomNav(active) {
@@ -683,16 +690,8 @@ function topbar(title, backHash) {
 function viewHome(weekNum) {
   const week = weekByNumber(weekNum) || allWeeks()[0];
   const wrap = el(`<div>
-    <div class="page">
-      <button class="day-card now" type="button" data-abs>
-        <div class="day-mark">M</div>
-        <div>
-          <div class="title">Mave</div>
-          <div class="sub">Øvelser + WOD</div>
-        </div>
-        <div class="chev">›</div>
-      </button>
-      <div class="week-pills"></div>
+    <div class="page home">
+      <div class="week-pills" aria-label="Vælg træningsuge"></div>
       <h2 class="week-title">Uge ${week.number}${week.phase ? ` · ${escapeHtml(week.phase)}` : ""}</h2>
       <div class="day-list"></div>
     </div>
@@ -705,12 +704,18 @@ function viewHome(weekNum) {
     ${(PROGRAM.guide || []).map((text) => `<p>${escapeHtml(text)}</p>`).join("")}
     <button class="btn" data-warmup>Se opvarmning</button></details>`);
   $("[data-warmup]", guidance).addEventListener("click", () => go("/warmup"));
-  $(".week-pills", wrap).before(guidance);
-  $("[data-abs]", wrap).addEventListener("click", () => go("/abs"));
+  $(".day-list", wrap).after(guidance);
+  const nextDay = week.days.findIndex((day, i) => day.type !== "rest" && !day.optional && dayProgress(week.number, i, day).done < dayProgress(week.number, i, day).total);
+  if (nextDay >= 0) {
+    const day = week.days[nextDay];
+    const next = el(`<button class="resume-workout" data-resume type="button"><span><b>Fortsæt ${escapeHtml(dayShort(day.name))}</b><small>Uge ${week.number} · ${dayProgress(week.number, nextDay, day).done}/${day.exercises.length} øvelser færdige</small></span>${ICONS.forward}</button>`);
+    next.addEventListener("click", () => go(`/w/${week.number}/d/${nextDay}`));
+    $(".day-list", wrap).before(next);
+  }
 
   const pills = $(".week-pills", wrap);
   allWeeks().forEach((w) => {
-    const b = el(`<button class="week-pill ${w.number === week.number ? "on" : ""}" type="button">${w.number}</button>`);
+    const b = el(`<button class="week-pill ${w.number === week.number ? "on" : ""}" aria-label="Uge ${w.number}" ${w.number === week.number ? 'aria-current="true"' : ""} type="button">${w.number}</button>`);
     b.addEventListener("click", (e) => {
       e.preventDefault();
       go(`/w/${w.number}`);
@@ -730,7 +735,7 @@ function viewHome(weekNum) {
         <div class="title">${escapeHtml(dayShort(day.name))}${day.optional ? " · valgfri" : ""}</div>
         <div class="sub">${day.type === "rest" ? escapeHtml(day.note || "Hvile") : `${p.done}/${p.total} øvelser`}</div>
       </div>
-      <div class="chev">›</div>
+      <div class="chev">${ICONS.forward}</div>
     </button>`);
     card.addEventListener("click", () => go(`/w/${week.number}/d/${i}`));
     list.appendChild(card);
@@ -840,7 +845,7 @@ function viewWorkout(weekNum, dayIdx, openIdx) {
   const wrap = el(`<div>
     <div class="page workout">
       <div class="progress-wrap">
-        <p class="program-caption">${escapeHtml(PROGRAM.shortTitle)}${week.phase ? ` · ${escapeHtml(week.phase)}` : ""}</p>
+        <p class="program-caption">${escapeHtml(PROGRAM.shortTitle)} · uge ${week.number}${week.phase ? ` · ${escapeHtml(week.phase)}` : ""}</p>
         <div class="progress-meta"><span>${escapeHtml(dayShort(day.name))}</span><span>${p.done}/${p.total}</span></div>
         <div class="bar"><span style="width:${p.total ? (p.done / p.total) * 100 : 0}%"></span></div>
       </div>
@@ -848,7 +853,7 @@ function viewWorkout(weekNum, dayIdx, openIdx) {
       <div class="ex-list"></div>
     </div>
   </div>`);
-  wrap.prepend(topbar(week.name, `/w/${weekNum}`));
+  wrap.prepend(topbar(dayShort(day.name), `/w/${weekNum}`));
   const list = $(".ex-list", wrap);
   day.exercises.forEach((ex, i) => list.appendChild(exerciseCard(weekNum, dayIdx, i, ex, i === open)));
   return wrap;
@@ -872,11 +877,11 @@ function previousSession(last, ex) {
   const title = last.source === "sheet" ? "Fra dit gamle Excel-ark" : "Sidst registreret";
   const recorded = last.sets.filter((set) => String(set.weight ?? "").trim() || String(set.reps ?? "").trim()).length;
   const count = recorded === last.sets.length ? `${recorded} sæt` : `${recorded} af ${last.sets.length} sæt registreret`;
-  return `<section class="previous-session" aria-label="Tidligere træning">
-    <p class="previous-title">${title} · uge ${last.week} · ${escapeHtml(last.day)}</p>
+  return `<details class="previous-session" aria-label="Tidligere træning">
+    <summary class="previous-title">${title} · uge ${last.week} · ${escapeHtml(last.day)}</summary>
     <p class="previous-count">${count}</p>
     <ol>${last.sets.map((set, i) => `<li><span>Sæt ${i + 1}</span><b>${escapeHtml(previousSetText(set, ex))}</b></li>`).join("")}</ol>
-  </section>`;
+  </details>`;
 }
 
 function abbreviationHelp(ex, chosen) {
@@ -927,28 +932,31 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
 
   const card = el(`<article class="ex-card ${done ? "done" : ""} ${isOpen ? "open" : ""}" data-key="${logKey(week, dayIdx, exIdx)}">
     <div class="ex-head">
-      <button class="check" data-check aria-label="Markér lavet">${ICONS.check}</button>
-      <button class="ex-toggle" style="flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;color:inherit">
+      <button class="ex-toggle" aria-expanded="${isOpen}" aria-label="${escapeHtml(chosen.name)} · ${sets.length} sæt" style="flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;color:inherit">
         <div class="ex-name">${escapeHtml(chosen.name)}</div>
         <div class="ex-meta">${sets.length} × ${escapeHtml(ex.reps)}</div>
         ${sidst ? `<div class="last">${last.source === "sheet" ? "Ark" : "Sidst"} · uge ${last.week}: ${escapeHtml(sidst)}</div>` : ""}
       </button>
-      ${alts.length > 1 ? `<button class="alt-btn" data-swap type="button" aria-label="Byt øvelse">⇄</button>` : ""}
-      ${chosen.youtube ? `<a class="yt" href="${escapeHtml(chosen.youtube)}" target="_blank" rel="noopener" aria-label="Video">${ICONS.play}</a>` : ""}
+      <button class="check" data-check aria-label="Markér hele øvelsen lavet" title="Markér hele øvelsen lavet">${ICONS.check}</button>
     </div>
     <div class="ex-body">
+      <div class="exercise-tools">
+        <span class="exercise-dose">Opvarmning <b>${escapeHtml(ex.warmupSets || "0")} sæt</b><br>Pause <b>${ex.rest === "-" ? "ingen" : escapeHtml(ex.rest)}</b></span>
+        <div>${alts.length > 1 ? `<button class="alt-btn" data-swap type="button" aria-label="Byt øvelse">${ICONS.swap}<span>Byt</span></button>` : ""}
+        ${chosen.youtube ? `<a class="yt" href="${escapeHtml(chosen.youtube)}" target="_blank" rel="noopener" aria-label="Video">${ICONS.play}<span>Video</span></a>` : ""}</div>
+      </div>
+      ${supersetHelp(week, dayIdx, ex)}
+      ${ex.intensity ? `<p class="technique intensity-note">Sidste sæt: <b>${escapeHtml(ex.intensity)}</b></p>` : ""}
+      ${previousSession(last, ex)}
+      <div class="sets"></div>
+      <button class="next-set-action" type="button" data-next-set>${ICONS.check}<span></span></button>
       <div class="exercise-plan">
         ${ex.repLabel ? `<p class="rep-label">${escapeHtml(ex.repLabel)}</p>` : ""}
-        <p>Opvarmning: <b>${escapeHtml(ex.warmupSets || "0")} sæt</b> · Pause: <b>${ex.rest === "-" ? "direkte til næste øvelse" : escapeHtml(ex.rest)}</b></p>
-        ${supersetHelp(week, dayIdx, ex)}
-        ${ex.intensity ? `<p class="technique">Teknik på sidste sæt: <b>${escapeHtml(ex.intensity)}</b></p>` : ""}
         ${ex.rir ? '<p class="rir-help">RIR = gentagelser i reserve. 0 = ingen tilbage, 1 = én tilbage, 2 = to tilbage.</p>' : `<p class="rir-help">RPE = hvor krævende sættet er (op til 10). 10 = ingen reps tilbage, 9 = én tilbage, 8 = to tilbage.</p><p>RPE-mål: ${escapeHtml(ex.earlyRpe)} → ${escapeHtml(ex.lastRpe)}</p>`}
         ${techniqueGuide(ex.intensity)}
         ${abbreviationHelp(ex, chosen)}
         ${ex.cue ? `<details><summary>Teknik og vejledning</summary><p>${escapeHtml(ex.cue)}</p></details>` : ""}
       </div>
-      ${previousSession(last, ex)}
-      <div class="sets"></div>
     </div>
   </article>`);
 
@@ -956,8 +964,9 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
   sets.forEach((s, i) => {
     const row = el(`<div class="set-row ${s.done ? "done" : ""}">
       <div class="set-top">
-        <button class="set-check ${s.done ? "on" : ""}" data-sd="${i}" aria-label="Sæt lavet">${ICONS.check}</button>
-        <div class="set-lab">Sæt ${i + 1}${ex.rir?.[i] != null ? ` · RIR ${escapeHtml(ex.rir[i])}` : ""}${ex.intensity && i === sets.length - 1 ? " · + teknik" : ""}</div>
+        <div class="set-lab"><div>Sæt ${i + 1}${ex.rir?.[i] != null ? `<span class="set-effort">RIR ${escapeHtml(ex.rir[i])} · ${escapeHtml(ex.rir[i])} tilbage</span>` : `<span class="set-effort">RPE ${escapeHtml(i === sets.length - 1 ? ex.lastRpe : ex.earlyRpe)}</span>`}${ex.intensity && i === sets.length - 1 ? " · + teknik" : ""}</div>
+        <div class="set-previous">${last?.sets?.[i] ? `Sidst: ${escapeHtml(previousSetText(last.sets[i], ex))}` : "Dit første registrerede sæt"}</div></div>
+        <button class="set-check ${s.done ? "on" : ""}" data-sd="${i}" aria-label="${s.done ? "Fortryd" : "Markér"} sæt ${i + 1} lavet" aria-pressed="${Boolean(s.done)}">${ICONS.check}</button>
       </div>
       <div class="set-grid">
         <div class="step">
@@ -981,6 +990,25 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
     setsBox.appendChild(row);
   });
 
+  const updateNextSet = () => {
+    const rows = $$(".set-row", setsBox);
+    const first = rows.findIndex((row) => !$("[data-sd]", row).classList.contains("on"));
+    rows.forEach((row, i) => row.classList.toggle("current", i === first));
+    const action = $("[data-next-set]", card);
+    action.disabled = first < 0;
+    $("span", action).textContent = first < 0 ? "Alle sæt er færdige" : `Markér sæt ${first + 1} færdigt`;
+    const hadFocus = document.activeElement === action;
+    if (first >= 0 && action.parentElement !== rows[first]) rows[first].appendChild(action);
+    else if (first < 0 && action.parentElement === setsBox) setsBox.after(action);
+    if (hadFocus && !action.disabled) action.focus({ preventScroll: true });
+    return first;
+  };
+  updateNextSet();
+  $("[data-next-set]", card).addEventListener("click", () => {
+    const first = updateNextSet();
+    if (first >= 0) $(`[data-sd="${first}"]`, setsBox).click();
+  });
+
   const persist = (userInput = true) => {
     const next = $$("[data-w]", setsBox).map((wEl, i) => ({
       weight: wEl.value.trim(),
@@ -988,6 +1016,7 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
       done: setsBox.querySelector(`[data-sd="${i}"]`)?.classList.contains("on") || false,
     }));
     const allDone = next.length > 0 && next.every((s) => s.done);
+    updateNextSet();
     const source = userInput === false ? getLog(week, dayIdx, exIdx)?.source || "prefill" : "user";
     patchLog(week, dayIdx, exIdx, { name: chosen.name, sets: next, done: allDone, alt: Number(log?.alt || 0), source });
     card.classList.toggle("done", allDone);
@@ -1034,6 +1063,8 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
   $$("[data-sd]", card).forEach((btn) => {
     btn.addEventListener("click", () => {
       btn.classList.toggle("on");
+      btn.setAttribute("aria-pressed", String(btn.classList.contains("on")));
+      btn.setAttribute("aria-label", `${btn.classList.contains("on") ? "Fortryd" : "Markér"} sæt ${Number(btn.dataset.sd) + 1} lavet`);
       btn.closest(".set-row").classList.toggle("done", btn.classList.contains("on"));
       const next = persist();
       if (btn.classList.contains("on")) {
@@ -1056,6 +1087,9 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
       if (next.every((s) => s.done)) {
         toast("Øvelse færdig");
         advanceAfterExercise(week, dayIdx, exIdx);
+      } else if (btn.classList.contains("on")) {
+        const current = $(".set-row.current", card);
+        if (current) current.scrollIntoView({ block: "center", behavior: "auto" });
       }
     });
   });

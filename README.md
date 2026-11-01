@@ -52,7 +52,11 @@ Fil- og skybackup indeholder begge programmer. Gendannelse fletter logs og bevar
 nyere lokale registreringer samt andre programmers historik. Nulstilling gælder
 kun det valgte program. Det oprindelige `program.json` er uændret.
 
-Service worker v20 cacher begge programmer og kun appens statiske filer.
+Mobilvisningen viser tidligere kg/reps ved det relevante sæt. Knappen
+"Markér sæt færdigt" følger næste ufærdige sæt, og forsiden har en genvej til
+næste pas i den valgte uge. Pausetimeren ligger over bundmenuen.
+
+Service worker v21 cacher begge programmer og kun appens statiske filer.
 Backup-API'er og eksterne svar caches ikke. Efter en udgivelse kan en allerede
 åben installation kræve, at man lukker og åbner appen igen online.
 
@@ -62,6 +66,7 @@ Backup-API'er og eksterne svar caches ikke. Efter en udgivelse kan en allerede
 node --test tests/program-state.test.cjs
 node --test tests/exercise-history.test.cjs
 node tests/browser.cjs
+node tests/mobile-ui.cjs
 ```
 
 Browsertesten kræver Playwright og en installeret Chromium-browser. Den starter
