@@ -55,8 +55,10 @@ kun det valgte program. Det oprindelige `program.json` er uændret.
 Mobilvisningen viser tidligere kg/reps ved det relevante sæt. Knappen
 "Markér sæt færdigt" følger næste ufærdige sæt, og forsiden har en genvej til
 næste pas i den valgte uge. Pausetimeren ligger over bundmenuen.
+Historikværdier vises kun ved deres sæt. Forkortelser forklares i hjælpen,
+og intensitetsteknikker beskrives én gang ved den relevante øvelse.
 
-Service worker v22 cacher begge programmer og kun appens statiske filer.
+Service worker v23 cacher begge programmer og kun appens statiske filer.
 Online hentes startsiden fra netværket, så nye mobilvisninger bliver synlige.
 Installation af en ny cache genindlæser filerne frem for at kopiere en gammel
 HTTP-cache. Offline bruges den gemte app som hidtil.

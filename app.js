@@ -846,7 +846,7 @@ function viewWorkout(weekNum, dayIdx, openIdx) {
     <div class="page workout">
       <div class="progress-wrap">
         <p class="program-caption">${escapeHtml(PROGRAM.shortTitle)} · uge ${week.number}${week.phase ? ` · ${escapeHtml(week.phase)}` : ""}</p>
-        <div class="progress-meta"><span>${escapeHtml(dayShort(day.name))}</span><span>${p.done}/${p.total}</span></div>
+        <div class="progress-meta"><span>${p.done}/${p.total} øvelser færdige</span></div>
         <div class="bar"><span style="width:${p.total ? (p.done / p.total) * 100 : 0}%"></span></div>
       </div>
       ${day.note ? `<p class="session-note">${escapeHtml(day.note)}</p>` : ""}
@@ -872,16 +872,11 @@ function previousSetText(set, ex) {
   return `${weight ? `${weight} kg` : "Vægt ikke registreret"}${reps ? ` × ${reps} reps` : " · reps ikke registreret"}`;
 }
 
-function previousSession(last, ex) {
-  if (!last) return '<section class="previous-session empty"><p>Ingen tidligere registrering af denne øvelse endnu.</p></section>';
-  const title = last.source === "sheet" ? "Fra dit gamle Excel-ark" : "Sidst registreret";
-  const recorded = last.sets.filter((set) => String(set.weight ?? "").trim() || String(set.reps ?? "").trim()).length;
-  const count = recorded === last.sets.length ? `${recorded} sæt` : `${recorded} af ${last.sets.length} sæt registreret`;
-  return `<details class="previous-session" aria-label="Tidligere træning">
-    <summary class="previous-title">${title} · uge ${last.week} · ${escapeHtml(last.day)}</summary>
-    <p class="previous-count">${count}</p>
-    <ol>${last.sets.map((set, i) => `<li><span>Sæt ${i + 1}</span><b>${escapeHtml(previousSetText(set, ex))}</b></li>`).join("")}</ol>
-  </details>`;
+function previousSession(last, currentDay) {
+  if (!last) return '<p class="previous-session previous-title">Ingen tidligere træning registreret.</p>';
+  const title = last.source === "sheet" ? "Excel-historik" : "Tidligere træning";
+  const day = last.day && last.day !== currentDay ? ` · ${escapeHtml(last.day)}` : "";
+  return `<p class="previous-session previous-title">${title} · uge ${last.week}${day}</p>`;
 }
 
 function abbreviationHelp(ex, chosen) {
@@ -905,8 +900,11 @@ function abbreviationHelp(ex, chosen) {
     [/failure/i, "Failure", "Du kan ikke gennemføre endnu en hel gentagelse."],
     [/~/, "~", "Cirka. Fx ~8–9 betyder omkring 8 til 9."],
   ];
-  for (const [pattern, term, definition] of definitions) if (pattern.test(text)) terms.push([term, definition]);
-  if (ex.superset) terms.push([ex.superset, `Superset nr. ${ex.superset.replace(/\D/g, "")}: lav ét sæt af hver øvelse i parret, derefter pause. Gentag parret.`]);
+  for (const [pattern, term, definition] of definitions) {
+    if (term === "Failure" && /failure|myo|llp/i.test(ex.intensity || "")) continue;
+    if (term === "LLPs" && /llp|lengthened partial/i.test(ex.intensity || "")) continue;
+    if (pattern.test(text)) terms.push([term, definition]);
+  }
   return `<details class="abbreviation-help"><summary>Forkortelser i denne øvelse</summary><dl>${terms.map(([term, definition]) => `<dt>${escapeHtml(term)}</dt><dd>${escapeHtml(definition)}</dd>`).join("")}</dl></details>`;
 }
 
@@ -934,7 +932,7 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
     <div class="ex-head">
       <button class="ex-toggle" aria-expanded="${isOpen}" aria-label="${escapeHtml(chosen.name)} · ${sets.length} sæt" style="flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;color:inherit">
         <div class="ex-name">${escapeHtml(chosen.name)}</div>
-        <div class="ex-meta">${sets.length} × ${escapeHtml(ex.reps)}</div>
+        <div class="ex-meta">${sets.length} × ${escapeHtml(ex.reps)}${ex.repLabel ? `<span class="rep-label">${escapeHtml(ex.repLabel)}</span>` : ""}</div>
         ${sidst ? `<div class="last">${last.source === "sheet" ? "Ark" : "Sidst"} · uge ${last.week}: ${escapeHtml(sidst)}</div>` : ""}
       </button>
       <button class="check" data-check aria-label="Markér hele øvelsen lavet" title="Markér hele øvelsen lavet">${ICONS.check}</button>
@@ -946,14 +944,11 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
         ${chosen.youtube ? `<a class="yt" href="${escapeHtml(chosen.youtube)}" target="_blank" rel="noopener" aria-label="Video">${ICONS.play}<span>Video</span></a>` : ""}</div>
       </div>
       ${supersetHelp(week, dayIdx, ex)}
-      ${ex.intensity ? `<p class="technique intensity-note">Sidste sæt: <b>${escapeHtml(ex.intensity)}</b></p>` : ""}
-      ${previousSession(last, ex)}
+      ${ex.intensity && ex.intensity !== "N/A" ? (techniqueGuide(ex.intensity) ? `<div class="intensity-note"><b>Efter sidste sæt</b>${techniqueGuide(ex.intensity)}</div>` : `<p class="intensity-note">Sidste sæt: ${escapeHtml(ex.intensity)}</p>`) : ""}
+      ${previousSession(last, dayShort(weekByNumber(week).days[dayIdx].name))}
       <div class="sets"></div>
       <button class="next-set-action" type="button" data-next-set>${ICONS.check}<span></span></button>
       <div class="exercise-plan">
-        ${ex.repLabel ? `<p class="rep-label">${escapeHtml(ex.repLabel)}</p>` : ""}
-        ${ex.rir ? '<p class="rir-help">RIR = gentagelser i reserve. 0 = ingen tilbage, 1 = én tilbage, 2 = to tilbage.</p>' : `<p class="rir-help">RPE = hvor krævende sættet er (op til 10). 10 = ingen reps tilbage, 9 = én tilbage, 8 = to tilbage.</p><p>RPE-mål: ${escapeHtml(ex.earlyRpe)} → ${escapeHtml(ex.lastRpe)}</p>`}
-        ${techniqueGuide(ex.intensity)}
         ${abbreviationHelp(ex, chosen)}
         ${ex.cue ? `<details><summary>Teknik og vejledning</summary><p>${escapeHtml(ex.cue)}</p></details>` : ""}
       </div>
@@ -964,8 +959,8 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
   sets.forEach((s, i) => {
     const row = el(`<div class="set-row ${s.done ? "done" : ""}">
       <div class="set-top">
-        <div class="set-lab"><div>Sæt ${i + 1}${ex.rir?.[i] != null ? `<span class="set-effort">RIR ${escapeHtml(ex.rir[i])} · ${escapeHtml(ex.rir[i])} tilbage</span>` : `<span class="set-effort">RPE ${escapeHtml(i === sets.length - 1 ? ex.lastRpe : ex.earlyRpe)}</span>`}${ex.intensity && i === sets.length - 1 ? " · + teknik" : ""}</div>
-        <div class="set-previous">${last?.sets?.[i] ? `Sidst: ${escapeHtml(previousSetText(last.sets[i], ex))}` : "Dit første registrerede sæt"}</div></div>
+        <div class="set-lab"><div>Sæt ${i + 1}${ex.rir?.[i] != null ? `<span class="set-effort">RIR ${escapeHtml(ex.rir[i])}</span>` : `<span class="set-effort">RPE ${escapeHtml(i === sets.length - 1 ? ex.lastRpe : ex.earlyRpe)}</span>`}</div>
+        ${last?.sets?.[i] ? `<div class="set-previous">Sidst: ${escapeHtml(previousSetText(last.sets[i], ex))}</div>` : ""}</div>
         <button class="set-check ${s.done ? "on" : ""}" data-sd="${i}" aria-label="${s.done ? "Fortryd" : "Markér"} sæt ${i + 1} lavet" aria-pressed="${Boolean(s.done)}">${ICONS.check}</button>
       </div>
       <div class="set-grid">
@@ -973,16 +968,16 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
           <span>Kg</span>
           <input class="field" aria-label="Kg, sæt ${i + 1}" inputmode="decimal" value="${escapeHtml(s.weight)}" data-w="${i}" />
           <div class="step-row">
-            <button class="nudge" data-b="${i}" data-d="-1.25">−</button>
-            <button class="nudge" data-b="${i}" data-d="1.25">+</button>
+            <button class="nudge" data-b="${i}" data-d="-1.25" aria-label="Sænk vægt, sæt ${i + 1}">−</button>
+            <button class="nudge" data-b="${i}" data-d="1.25" aria-label="Øg vægt, sæt ${i + 1}">+</button>
           </div>
         </div>
         <div class="step">
           <span>${ex.unit === "sek" ? "Sekunder" : "Reps"}</span>
-          <input class="field" aria-label="${ex.unit === "sek" ? "Sekunder" : "Reps"}, sæt ${i + 1}" inputmode="decimal" placeholder="${escapeHtml(ex.reps || "")}" value="${escapeHtml(s.reps)}" data-r="${i}" />
+          <input class="field" aria-label="${ex.unit === "sek" ? "Sekunder" : "Reps"}, sæt ${i + 1}" inputmode="decimal" placeholder="—" value="${escapeHtml(s.reps)}" data-r="${i}" />
           <div class="step-row">
-            <button class="nudge" data-rb="${i}" data-d="-1">−</button>
-            <button class="nudge" data-rb="${i}" data-d="1">+</button>
+            <button class="nudge" data-rb="${i}" data-d="-1" aria-label="Sænk antal, sæt ${i + 1}">−</button>
+            <button class="nudge" data-rb="${i}" data-d="1" aria-label="Øg antal, sæt ${i + 1}">+</button>
           </div>
         </div>
       </div>
@@ -1024,7 +1019,7 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
     if (day) {
       const p = dayProgress(week, dayIdx, day);
       const meta = $(".progress-meta");
-      if (meta) meta.lastElementChild.textContent = `${p.done}/${p.total}`;
+      if (meta) meta.lastElementChild.textContent = `${p.done}/${p.total} øvelser færdige`;
       const bar = $(".progress-wrap .bar > span");
       if (bar && p.total) bar.style.width = `${(p.done / p.total) * 100}%`;
     }
@@ -1126,7 +1121,7 @@ function techniqueGuide(technique) {
   if (t.includes("llp") || t.includes("lengthened partial")) text = "Failure = ingen hele gentagelser tilbage. LLPs = fortsæt derefter med delvise gentagelser i musklens strakte position.";
   else if (t.includes("drop")) text = "Drop set = efter sættet sænkes vægten ca. 25%. Fortsæt og gentag vægtreduktionen én gang mere (3 dele i alt).";
   else if (t.includes("myo")) text = "Myo-reps = når du ikke kan tage endnu en hel gentagelse, hvil 5 sekunder og forsøg 2 ekstra reps. Gentag, indtil du ikke kan gennemføre 2 hele reps.";
-  else if (t.includes("static")) text = "Statisk hold/stræk = efter sidste sæt holdes den nederste position under spænding i 30 sekunder.";
+  else if (t.includes("static")) text = "Statisk hold/stræk = hold den nederste position under spænding i 30 sekunder.";
   else if (t.includes("failure")) text = "Failure = du kan ikke gennemføre endnu en hel gentagelse.";
   else if (t === "n/a") text = "N/A = ingen ekstra intensitetsteknik i dette sæt.";
   return text ? `<p>${escapeHtml(text)}</p>` : "";

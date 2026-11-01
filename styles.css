@@ -601,19 +601,10 @@ body.has-timer .toast { bottom: calc(100px + var(--safe-bot)); }
 .program-guide p, .exercise-plan p, .session-note { font-size: 14px; line-height: 1.55; }
 .exercise-plan { padding: 2px 0 12px; overflow-wrap: anywhere; }
 .exercise-plan p { margin: 8px 0; }
-.exercise-plan .rir-help { color: var(--muted); font-size: 12px; }
 .abbreviation-help { margin: 10px 0; }
 .abbreviation-help dl { margin: 8px 0; font-size: 13px; }
 .abbreviation-help dt { color: var(--gold-2); font-weight: 700; margin-top: 10px; }
 .abbreviation-help dd { margin: 3px 0 0; line-height: 1.5; }
-.previous-session { margin: 0 0 14px; padding: 12px; background: var(--gold-dim); border: 1px solid var(--line-strong); border-radius: 12px; }
-.previous-title { margin: 0; font-size: 14px; color: var(--gold-2); font-weight: 700; }
-.previous-count { margin: 4px 0 8px; font-size: 12px; color: var(--muted); }
-.previous-session ol { list-style: none; padding: 0; margin: 0; }
-.previous-session li { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; font-size: 13px; }
-.previous-session li b { text-align: right; overflow-wrap: anywhere; }
-.previous-session.empty { background: var(--bg-elev); color: var(--muted); }
-.previous-session.empty p { margin: 0; font-size: 13px; }
 .technique, .rep-label { color: var(--gold-2); }
 .session-note { padding: 12px; border: 1px solid var(--line-strong); border-radius: 12px; color: var(--muted); }
 .set-lab { font-size: 13px; }
@@ -690,10 +681,13 @@ button:disabled:active { transform: none; }
 .ex-name { font-size: 16px; letter-spacing: -0.015em; font-weight: 650; line-height: 1.35; }
 .ex-card.open .ex-name { font-size: 21px; letter-spacing: -0.025em; font-weight: 750; }
 .ex-meta { margin-top: 6px; color: var(--muted); font-size: 13px; }
+.ex-meta .rep-label { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
 .ex-toggle { min-height: 44px; }
 .check { width: 44px; height: 44px; border: 1px solid var(--line-strong); margin: 0; }
 .check svg { width: 20px; height: 20px; }
+.check:hover, .set-check:hover { border-color: var(--gold); }
 .ex-card.open .last { display: none; }
+.ex-card.open > .ex-head > .check { display: none; }
 .last { font-weight: 500; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .ex-body { padding: 0 16px 16px; }
 .exercise-tools { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); font-size: 12px; color: var(--muted); }
@@ -704,12 +698,7 @@ button:disabled:active { transform: none; }
 .exercise-tools .yt svg { width: 14px; height: 14px; }
 .exercise-tools a:hover, .exercise-tools button:hover { color: var(--text); background: var(--card-2); }
 .previous-session { padding: 0; margin: 0; border: 0; border-radius: 0; background: transparent; }
-.previous-title { font-size: 12px; font-weight: 500; color: var(--muted); cursor: pointer; padding: 12px 0; line-height: 1.5; }
-.previous-session[open] { padding-bottom: 12px; }
-.previous-session ol { padding: 4px 0 0; }
-.previous-session li { font-size: 13px; }
-.previous-session.empty { padding: 12px 0 0; background: transparent; }
-.previous-session.empty p { font-size: 12px; }
+.previous-title { font-size: 12px; font-weight: 400; color: var(--muted); padding: 12px 0 4px; line-height: 1.5; }
 .sets { gap: 0; }
 .set-row { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 8px 0; background: transparent; }
 .set-row.done { border-color: var(--line); }
@@ -737,12 +726,12 @@ button:disabled:active { transform: none; }
 .next-set-action:active:not(:disabled), .resume-workout:active { transform: translateY(1px); }
 .exercise-plan { padding: 12px 0 0; }
 .exercise-plan > p { font-size: 12px; color: var(--muted); }
-.exercise-plan > .rir-help { font-size: 12px; line-height: 1.6; }
 .exercise-plan details { border-top: 1px solid var(--line); margin-top: 12px; }
 .exercise-plan summary { color: var(--muted); font-size: 13px; padding: 12px 0; min-height: 44px; }
 .exercise-plan details[open] summary { color: var(--text); }
 .technique { font-size: 13px; line-height: 1.5; }
-.intensity-note { padding: 10px 0 0; margin: 0; }
+.intensity-note { padding: 12px 0 0; margin: 0; font-size: 13px; color: var(--gold-2); line-height: 1.5; }
+.intensity-note p { margin: 4px 0 0; color: var(--muted); }
 .abbreviation-help dl { padding-bottom: 12px; }
 .tabbar { padding: 10px 20px calc(10px + var(--safe-bot)); gap: 8px; background: var(--bg); }
 .tabbar button { min-height: 48px; border-radius: 12px; background: transparent; color: var(--muted); border-color: transparent; font-size: 14px; font-weight: 650; }
