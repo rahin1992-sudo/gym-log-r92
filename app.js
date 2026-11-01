@@ -167,13 +167,13 @@ async function pushBackup() {
   } catch {}
 }
 
-async function pullBackup() {
+async function pullBackup(source = "auto") {
   let remote = null;
-  try {
+  if (source !== "cloud") try {
     const r = await fetch("/api/backup");
     if (r.ok) remote = await r.json();
   } catch {}
-  if (!remote && state.prefs.cloudId) {
+  if (!remote && source !== "pc" && state.prefs.cloudId) {
     try {
       const r = await fetch(`https://jsonblob.com/api/jsonBlob/${state.prefs.cloudId}`);
       if (r.ok) remote = await r.json();
@@ -933,7 +933,7 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
     .filter(({ set }) => String(set.weight ?? "").trim() || String(set.reps ?? "").trim())
     .map(({ set, i }) => `Sæt ${i + 1}: ${previousSetText(set, ex)}`).join(" · ");
 
-  const card = el(`<article class="ex-card ${done ? "done" : ""} ${isOpen ? "open" : ""}" data-key="${logKey(week, dayIdx, exIdx)}">
+  const card = el(`<article class="ex-card logged-exercise ${done ? "done" : ""} ${isOpen ? "open" : ""}" data-key="${logKey(week, dayIdx, exIdx)}">
     <div class="ex-head">
       <button class="ex-toggle" aria-expanded="${isOpen}" aria-label="${escapeHtml(chosen.name)} · ${sets.length} sæt" style="flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;color:inherit">
         <div class="ex-name">${escapeHtml(chosen.name)}</div>
@@ -971,17 +971,17 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
       <div class="set-grid">
         <div class="step">
           <span>Kg</span>
-          <input class="field" aria-label="Kg, sæt ${i + 1}" inputmode="decimal" value="${escapeHtml(s.weight)}" data-w="${i}" />
-          <div class="step-row">
+          <div class="step-control">
             <button class="nudge" data-b="${i}" data-d="-1.25" aria-label="Sænk vægt, sæt ${i + 1}">−</button>
+            <input class="field" aria-label="Kg, sæt ${i + 1}" inputmode="decimal" value="${escapeHtml(s.weight)}" data-w="${i}" />
             <button class="nudge" data-b="${i}" data-d="1.25" aria-label="Øg vægt, sæt ${i + 1}">+</button>
           </div>
         </div>
         <div class="step">
           <span>${ex.unit === "sek" ? "Sekunder" : "Reps"}</span>
-          <input class="field" aria-label="${ex.unit === "sek" ? "Sekunder" : "Reps"}, sæt ${i + 1}" inputmode="decimal" placeholder="—" value="${escapeHtml(s.reps)}" data-r="${i}" />
-          <div class="step-row">
+          <div class="step-control">
             <button class="nudge" data-rb="${i}" data-d="-1" aria-label="Sænk antal, sæt ${i + 1}">−</button>
+            <input class="field" aria-label="${ex.unit === "sek" ? "Sekunder" : "Reps"}, sæt ${i + 1}" inputmode="decimal" placeholder="—" value="${escapeHtml(s.reps)}" data-r="${i}" />
             <button class="nudge" data-rb="${i}" data-d="1" aria-label="Øg antal, sæt ${i + 1}">+</button>
           </div>
         </div>
@@ -1213,7 +1213,7 @@ function viewAbs() {
           <div class="ex-name">${escapeHtml(a.name)}</div>
           <div class="ex-meta">${escapeHtml(a.reps)}</div>
         </div>
-        <a class="yt" href="${escapeHtml(a.youtube)}" target="_blank" rel="noopener" aria-label="Video">${ICONS.play}</a>
+        <a class="yt" href="${escapeHtml(a.youtube)}" target="_blank" rel="noopener" aria-label="Video: ${escapeHtml(a.name)}">${ICONS.play}<span>Video</span></a>
       </div>
     </div>`));
   });
@@ -1239,15 +1239,15 @@ function viewAbsWod() {
   });
   const list = $(".ex-list", wrap);
   state.wod.items.forEach((item, i) => {
-    const card = el(`<article class="ex-card ${item.done ? "done" : ""} open">
+    const card = el(`<article class="ex-card abs-exercise ${item.done ? "done" : ""} open">
       <div class="ex-head">
-        <button class="check" data-check>${ICONS.check}</button>
         <div style="flex:1;min-width:0">
           <div class="ex-name">${escapeHtml(item.name)}</div>
           <div class="ex-meta">3 × ${escapeHtml(item.reps)}</div>
         </div>
-        ${item.youtube ? `<a class="yt" href="${escapeHtml(item.youtube)}" target="_blank" rel="noopener">${ICONS.play}</a>` : ""}
+        ${item.youtube ? `<a class="yt" href="${escapeHtml(item.youtube)}" target="_blank" rel="noopener" aria-label="Video: ${escapeHtml(item.name)}">${ICONS.play}<span>Video</span></a>` : ""}
       </div>
+      <button class="abs-complete btn full" data-check aria-label="${item.done ? "Fortryd" : "Markér"} ${escapeHtml(item.name)}${item.done ? "" : " færdig"}" aria-pressed="${Boolean(item.done)}">${ICONS.check}<span>${item.done ? "Fortryd" : "Markér færdig"}</span></button>
     </article>`);
     $("[data-check]", card).addEventListener("click", () => {
       state.wod.items[i].done = !state.wod.items[i].done;
@@ -1298,15 +1298,21 @@ function viewSettings() {
     </div>
     <p>Kort = 1 min ved “1–2 min”, lang = 2 min.</p>
     <h2>Backup</h2>
-    <p>Begge programmer gemmes automatisk på denne enhed. Filbackup indeholder al historik. Skybackup forsøges, når du er online; computerbackup kræver den lokale server.</p>
-    <p>${p.lastPcSync ? "Computer: " + p.lastPcSync.slice(0, 16).replace("T", " ") : "Computer: venter på første gem"}</p>
-    <p>${p.lastCloudSync ? "Sky: " + p.lastCloudSync.slice(0, 16).replace("T", " ") : "Sky: venter på første gem"}</p>
-    ${p.cloudId ? `<p>Kode: <b>${escapeHtml(p.cloudId)}</b></p>` : ""}
+    <p>Din træning gemmes automatisk på denne enhed. En backupfil indeholder begge programmer og al historik.</p>
     <div class="actions">
-      <button class="btn primary" data-ex>Fil</button>
-      <label class="btn file-btn">Hent fil<input type="file" accept="application/json"></label>
+      <button class="btn primary" data-ex>Gem backupfil</button>
+      <label class="btn file-btn">Indlæs backupfil<input type="file" accept="application/json" aria-label="Indlæs backupfil"></label>
     </div>
-    <button class="btn full" data-cloud style="margin-top:8px">Gendan fra sky / computer</button>
+    <div class="backup-source">
+      <h3>Skybackup</h3>
+      <p>${p.lastCloudSync ? "Sidst gemt: " + p.lastCloudSync.slice(0, 16).replace("T", " ") : "Ingen skybackup gemt endnu. Gemmes automatisk, når du er online."}</p>
+      ${p.cloudId ? `<p>Kode: <b>${escapeHtml(p.cloudId)}</b></p>` : ""}
+      <button class="btn full" data-cloud data-restore="cloud" ${p.cloudId ? "" : "disabled"}>Gendan fra sky</button>
+    </div>
+    <details class="backup-source"><summary>Computerbackup</summary>
+      <p>${p.lastPcSync ? "Sidst gemt: " + p.lastPcSync.slice(0, 16).replace("T", " ") : "Kræver, at appen kører via backupserveren på din computer."}</p>
+      <button class="btn full" data-restore="pc">Gendan fra computer</button>
+    </details>
     <h2>Data</h2>
     <button class="btn full" data-reset style="margin-top:8px">Nulstil kun ${escapeHtml(PROGRAM.shortTitle)}</button>
   </div></div>`);
@@ -1350,11 +1356,16 @@ function viewSettings() {
       toast("Kunne ikke læse filen");
     }
   });
-  $("[data-cloud]", wrap).addEventListener("click", async () => {
-    const ok = await pullBackup();
-    toast(ok ? "Gendannet" : "Ingen backup fundet");
+  $$("[data-restore]", wrap).forEach((button) => button.addEventListener("click", async () => {
+    const source = button.dataset.restore;
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    const ok = await pullBackup(source);
+    button.disabled = false;
+    button.removeAttribute("aria-busy");
+    toast(ok ? `Gendannet fra ${source === "cloud" ? "sky" : "computer"}` : `Ingen backup fundet på ${source === "cloud" ? "skyen" : "computeren"}`);
     if (ok) { saveState(); go("/settings"); }
-  });
+  }));
   $("[data-reset]", wrap).addEventListener("click", () => {
     if (!confirm(`Nulstil logs i ${PROGRAM.shortTitle}? Det andet program bevares. Gem gerne en filbackup først.`)) return;
     state.logs = Object.fromEntries(Object.entries(state.logs).filter(([key]) => !ProgramState.belongsTo(key, state.activeProgram)));

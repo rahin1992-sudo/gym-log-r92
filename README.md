@@ -58,7 +58,14 @@ næste pas i den valgte uge. Pausetimeren ligger over bundmenuen.
 Historikværdier vises kun i boksen. Forkortelser forklares i hjælpen,
 og intensitetsteknikker beskrives én gang ved den relevante øvelse.
 
-Service worker v24 cacher begge programmer og kun appens statiske filer.
+Kg/reps har samlede kontroller med 44 px plus/minusknapper og tydeligere kanter.
+På mobilen bruger hvert felt hele rækkens bredde, så også gamle BTS-vægte som
+`2x 36.25kg` kan læses. Mave WOD har en synlig knap til færdig/fortryd, og
+maveøvelsernes videoknapper følger samme standard som hovedprogrammet.
+Backupfil kan gemmes eller indlæses med navngivne handlinger. Gendannelse fra
+sky og computer er adskilt og bruger kun den valgte kilde.
+
+Service worker v25 cacher begge programmer og kun appens statiske filer.
 Online hentes startsiden fra netværket, så nye mobilvisninger bliver synlige.
 Installation af en ny cache genindlæser filerne frem for at kopiere en gammel
 HTTP-cache. Offline bruges den gemte app som hidtil.
