@@ -54,6 +54,10 @@ const server = http.createServer((req,res)=>{
     await open.locator('[data-r="1"]').fill('5');
     await open.locator('[data-next-set]').press('Enter');
     await page.waitForURL('**/e/1');
+    await page.locator('.ex-card.open[data-key="min-max-phase-2|w2|d0|e1"]').waitFor();
+    assert.match(await page.locator('.ex-card.open .ex-meta').textContent(),/lettere vægt/,'High-rep load guidance must remain visible');
+    await page.locator('.ex-card.open [data-swap]').click();
+    assert.match(await page.locator('.ex-card.open .ex-meta').textContent(),/lettere vægt/,'Alternatives must retain the prescribed load guidance');
     assert.equal(await page.evaluate(()=>state.logs['min-max-phase-2|w2|d0|e0'].done),true);
     const dock=await page.locator('.timer-dock').boundingBox(), nav=await page.locator('.tabbar').boundingBox();
     assert.ok(dock.y+dock.height<=nav.y,'Rest timer and bottom navigation must not overlap');

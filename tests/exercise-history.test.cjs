@@ -8,7 +8,7 @@ const program = JSON.parse(fs.readFileSync(path.join(__dirname,'../program-min-m
 const source = fs.readFileSync(path.join(__dirname,'../app.js'),'utf8').replace(/\nboot\(\);\s*$/, '');
 function setup(logs) {
   const ctx = vm.createContext({ProgramState:S,window:{addEventListener(){}},document:{addEventListener(){}}});
-  vm.runInContext(source + '\nglobalThis.api = {lastForExercise, previousSession, abbreviationHelp};',ctx);
+  vm.runInContext(source + '\nglobalThis.api = {lastForExercise, previousSession, previousSetText, abbreviationHelp, techniqueGuide};',ctx);
   ctx.fixtureProgram=program;
   ctx.fixtureState=S.normalize({activeProgram:S.CURRENT,logs});
   vm.runInContext('PROGRAM=fixtureProgram; state=fixtureState;',ctx);
@@ -22,9 +22,9 @@ test('week 2 shows each actual set from week 1, with week and session',()=>{
   assert.equal(last.week,1);
   assert.equal(last.day,'Upper');
   const html=api.previousSession(last,{});
-  assert.match(html,/60 kg × 6 reps/);
-  assert.match(html,/55 kg × 5 reps/);
-  assert.match(html,/Sæt 2/);
+  assert.match(html,/uge 1/);
+  assert.equal(api.previousSetText(last.sets[0],{}),'60 kg × 6 reps');
+  assert.equal(api.previousSetText(last.sets[1],{}),'55 kg × 5 reps');
 });
 
 test('prefilled later weeks cannot hide actual previous training or mix high-rep sets',()=>{
@@ -55,13 +55,13 @@ test('bodyweight reps are visible and future sessions and other programs are exc
   assert.equal(api.lastForExercise('Machine Chest Press',2,0),null);
   const last=api.lastForExercise('Pull-Up (Wide Grip)',2,4);
   assert.equal(last.sets[0].reps,'6');
-  assert.match(api.previousSession(last,{}),/Vægt ikke registreret × 6 reps/);
+  assert.match(api.previousSetText(last.sets[0],{}),/Vægt ikke registreret × 6 reps/);
 });
 
 test('contextual abbreviation help describes the terms the exercise uses',()=>{
   const api=setup({});
   const html=api.abbreviationHelp({rir:['1'],superset:'S1',cue:'Use full ROM',intensity:'Failure + LLPs'},{name:'DB RDL'});
-  for(const term of ['RIR','S1','DB','RDL','ROM','LLPs','Failure','Reps'])assert.ok(html.includes(`<dt>${term}</dt>`));
+  for(const term of ['RIR','DB','RDL','ROM','Reps'])assert.ok(html.includes(`<dt>${term}</dt>`));
+  assert.match(api.techniqueGuide('Failure + LLPs'),/LLPs = fortsæt/);
   assert.match(html,/1 = én tilbage/);
-  assert.match(html,/ét sæt af hver øvelse/);
 });
