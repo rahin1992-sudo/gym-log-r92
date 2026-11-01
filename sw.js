@@ -1,13 +1,14 @@
-const CACHE = "bts-lift-v21";
+const CACHE = "bts-lift-v22";
 const ASSETS = [
-  "./", "./index.html", "./styles.css?v=21", "./program-state.js?v=21", "./app.js?v=21",
+  "./", "./index.html", "./styles.css?v=22", "./program-state.js?v=22", "./app.js?v=22",
   "./program.json", "./program-min-max-phase2.json", "./pain.json",
   "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png",
 ];
 const STATIC_URLS = new Set(ASSETS.map((path) => new URL(path, self.registration.scope).href));
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
+  const requests = ASSETS.map((path) => new Request(new URL(path, self.registration.scope), { cache: "reload" }));
+  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(requests)).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (event) => {
@@ -23,6 +24,18 @@ self.addEventListener("fetch", (event) => {
   // Only the static app shell belongs in the offline cache. Backup APIs stay live.
   event.respondWith(caches.open(CACHE).then(async (cache) => {
     const cached = await cache.match(url.href);
+    if (event.request.mode === "navigate") {
+      try {
+        const response = await fetch(event.request);
+        if (response.ok) {
+          await cache.put(url.href, response.clone());
+          return response;
+        }
+        return cached || response;
+      } catch {
+        return cached || Response.error();
+      }
+    }
     if (cached) return cached;
     const response = await fetch(event.request);
     if (response.ok) await cache.put(event.request, response.clone());
