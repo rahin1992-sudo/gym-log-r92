@@ -8,7 +8,7 @@ const output = process.env.SHOT_DIR;
 const stage = process.env.UI_STAGE || 'after';
 const fixture = {schemaVersion:2,activeProgram:'min-max-phase-2',programWeeks:{bts:1,'min-max-phase-2':2},week:2,logs:{
   'min-max-phase-2|w1|d0|e0':{source:'user',name:'Machine Chest Press',done:true,sets:[{weight:'60',reps:'6',done:true},{weight:'60',reps:'5',done:true}]},
-},prefs:{vibrate:false,keepAwake:false}};
+},wod:{items:[{name:'Hanging leg Raises',reps:'8–12',youtube:'https://www.youtube.com/watch?v=example',done:false},{name:'Rullemarie',reps:'8–12',done:false}],at:1},prefs:{vibrate:false,keepAwake:false}};
 const types={'.html':'text/html','.js':'text/javascript','.json':'application/json','.css':'text/css','.png':'image/png','.webmanifest':'application/manifest+json'};
 const server = http.createServer((req,res)=>{
   const url=new URL(req.url,'http://localhost');
@@ -37,7 +37,57 @@ const server = http.createServer((req,res)=>{
     await page.locator('.ex-card.open [data-w="0"]').waitFor();
     await page.evaluate(()=>scrollTo(0,0));
     if(output)await page.screenshot({path:path.join(output,`${stage}-workout.png`)});
-    if(stage==='before') {console.log('Captured before: identical example data, 390 × 844 viewport.');return;}
+    await page.setViewportSize({width:320,height:740});
+    await page.evaluate(()=>scrollTo(0,0));
+    if(output)await page.screenshot({path:path.join(output,`${stage}-workout-small.png`)});
+    if(stage!=='before'){
+      const action=await page.locator('.ex-card.open [data-next-set]').boundingBox();
+      const nav=await page.locator('.tabbar').boundingBox();
+      assert.ok(action.y+action.height<=nav.y,'History and the first set action must fit above navigation at 320 × 740');
+    }
+    await page.setViewportSize({width:390,height:844});
+    await page.goto(base+'#/abs/wod');
+    await page.locator('.ex-card').first().waitFor();
+    if(output)await page.screenshot({path:path.join(output,`${stage}-abs-wod.png`)});
+    if(stage!=='before'){
+      const complete=page.getByRole('button',{name:'Markér Hanging leg Raises færdig',exact:true});
+      assert.equal(await complete.isVisible(),true,'Mave WOD must expose a usable completion action');
+      await complete.click();
+      assert.equal(await page.evaluate(()=>state.wod.items[0].done),true);
+      await page.getByRole('button',{name:'Fortryd Hanging leg Raises',exact:true}).click();
+      assert.equal(await page.evaluate(()=>state.wod.items[0].done),false);
+      await page.reload();
+      await page.locator('.ex-card').first().waitFor();
+      assert.equal(await page.evaluate(()=>state.wod.items[0].done),false,'Undo must persist after reload');
+    }
+    await page.goto(base+'#/settings');
+    await page.locator('[data-ex]').waitFor();
+    if(output)await page.screenshot({path:path.join(output,`${stage}-settings.png`),fullPage:true});
+    if(stage==='before') {console.log('Captured before: identical example data and viewport sizes.');return;}
+    const downloadEvent=page.waitForEvent('download');
+    await page.getByRole('button',{name:'Gem backupfil',exact:true}).click();
+    assert.match((await downloadEvent).suggestedFilename(),/backup.*\.json$/);
+    assert.equal(await page.getByLabel('Indlæs backupfil',{exact:true}).count(),1);
+    const restores=[];
+    await context.route('**/api/backup',route=>{
+      if(route.request().method()==='GET')restores.push('pc');
+      return route.fulfill({status:404,body:''});
+    });
+    await context.route('https://jsonblob.com/**',route=>{
+      if(route.request().method()==='GET')restores.push('cloud');
+      return route.fulfill({status:404,body:''});
+    });
+    await page.evaluate(()=>{state.prefs.cloudId='test-backup';render();});
+    await page.getByRole('button',{name:'Gendan fra sky',exact:true}).click();
+    await page.getByText('Ingen backup fundet på skyen',{exact:true}).waitFor();
+    assert.deepEqual(restores,['cloud'],'Cloud restore must not use the computer backup');
+    await page.locator('.backup-source summary').click();
+    await page.getByRole('button',{name:'Gendan fra computer',exact:true}).click();
+    await page.getByText('Ingen backup fundet på computeren',{exact:true}).waitFor();
+    assert.deepEqual(restores,['cloud','pc'],'Computer restore must not silently fall back to the cloud');
+    await page.goto(base+'#/p/min-max-phase-2/w/2/d/0/e/0');
+    await page.locator('.ex-card.open [data-w="0"]').waitFor();
+    await page.evaluate(()=>scrollTo(0,0));
     // Removing the primary set action must fail this task-level test.
     assert.equal(await page.locator('.ex-card.open [data-next-set]').count(),1,'A clearly labelled primary action must complete the next set');
     const open=page.locator('.ex-card.open');
@@ -46,6 +96,12 @@ const server = http.createServer((req,res)=>{
     assert.ok(primary.y+primary.height<=navigation.y,'The next-set action must be fully visible above mobile navigation');
     assert.match(await open.locator('.previous-session li').first().textContent(),/60 kg × 6 reps/);
     assert.match(await open.locator('.previous-session li').nth(1).textContent(),/60 kg × 5 reps/);
+    assert.equal(await open.locator('.previous-session').count(),1,'Previous results must appear in one box');
+    assert.equal(await open.locator('.last').isVisible(),false,'The condensed history must stay hidden while the box is open');
+    await open.getByRole('button',{name:'Øg vægt, sæt 1',exact:true}).click();
+    assert.equal(await open.locator('[data-w="0"]').inputValue(),'61.25');
+    await open.getByRole('button',{name:'Sænk vægt, sæt 1',exact:true}).click();
+    assert.equal(await open.locator('[data-w="0"]').inputValue(),'60');
     await open.locator('[data-r="0"]').fill('6');
     await open.locator('[data-next-set]').click();
     assert.equal(await page.evaluate(()=>state.logs['min-max-phase-2|w2|d0|e0'].sets[0].done),true);
@@ -75,6 +131,16 @@ const server = http.createServer((req,res)=>{
       }
     });
     assert.ok(multi,'BTS fixture must include a workout with at least three sets');
+    await page.goto(base+`#/p/bts/w/${multi.week}/d/${multi.day}/e/${multi.exercise}`);
+    await page.locator('.ex-card.open [data-w="0"]').fill('2x 36.25kg');
+    for(const width of [320,360,390]){
+      await page.setViewportSize({width,height:844});
+      assert.equal(await page.locator('.ex-card.open [data-w="0"]').evaluate(input=>{
+        const style=getComputedStyle(input),canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');
+        ctx.font=`${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+        return ctx.measureText(input.value).width<=input.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight);
+      }),true,`Existing compound BTS loads must be readable in full at ${width}px`);
+    }
     await page.setViewportSize({width:320,height:740});
     await page.goto(base+`#/p/bts/w/${multi.week}/d/${multi.day}/e/${multi.exercise}`);
     await page.locator('.ex-card.open').waitFor();
