@@ -697,15 +697,19 @@ button:disabled:active { transform: none; }
 .exercise-tools svg { width: 16px; height: 16px; }
 .exercise-tools .yt svg { width: 14px; height: 14px; }
 .exercise-tools a:hover, .exercise-tools button:hover { color: var(--text); background: var(--card-2); }
-.previous-session { padding: 0; margin: 0; border: 0; border-radius: 0; background: transparent; }
-.previous-title { font-size: 12px; font-weight: 400; color: var(--muted); padding: 12px 0 4px; line-height: 1.5; }
+.previous-session { margin: 8px 0 12px; padding: 12px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--gold-dim); }
+.previous-title { margin: 0; color: var(--gold-2); font-size: 13px; font-weight: 700; line-height: 1.5; }
+.previous-count { margin: 4px 0 8px; color: var(--muted); font-size: 12px; }
+.previous-session ol { list-style: none; padding: 0; margin: 0; }
+.previous-session li { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; font-size: 13px; font-variant-numeric: tabular-nums; }
+.previous-session li b { text-align: right; overflow-wrap: anywhere; }
+.previous-session.empty { padding: 4px 0; border: 0; border-radius: 0; background: transparent; color: var(--muted); font-size: 12px; }
 .sets { gap: 0; }
 .set-row { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 8px 0; background: transparent; }
 .set-row.done { border-color: var(--line); }
 .set-top { gap: 8px; align-items: center; margin-bottom: 10px; }
 .set-lab { font-size: 15px; font-weight: 700; color: var(--text); }
 .set-effort { margin-left: 10px; color: var(--muted); font-size: 12px; font-weight: 400; white-space: nowrap; }
-.set-previous { margin-top: 5px; color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.45; font-variant-numeric: tabular-nums; }
 .set-row.current .set-lab > div:first-child { color: var(--gold-2); }
 .set-row.current .set-effort { color: var(--muted); }
 .set-check { flex: 0 0 44px; width: 44px; height: 44px; border: 1px solid var(--line-strong); }

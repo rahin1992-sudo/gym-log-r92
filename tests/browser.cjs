@@ -51,7 +51,7 @@ const server=http.createServer((req,res)=>{
     await page.goto(base+'/#/p/min-max-phase-2/w/2/d/0/e/0');
     await page.locator('.previous-title').first().waitFor();
     assert.match(await page.locator('.ex-card.open .previous-session').textContent(),/uge 1/);
-    assert.match(await page.locator('.ex-card.open .set-previous').first().textContent(),/60 kg × 6 reps/);
+    assert.match(await page.locator('.ex-card.open .previous-session').textContent(),/60 kg × 6 reps/);
     await page.locator('.ex-card.open .abbreviation-help summary').click();
     assert.match(await page.locator('.ex-card.open .abbreviation-help').textContent(),/1 = én tilbage/);
     if(process.env.SHOT_DIR)await page.screenshot({path:path.join(process.env.SHOT_DIR,'workout-mobile.png'),fullPage:true});

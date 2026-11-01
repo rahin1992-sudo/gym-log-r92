@@ -23,6 +23,9 @@ test('week 2 shows each actual set from week 1, with week and session',()=>{
   assert.equal(last.day,'Upper');
   const html=api.previousSession(last,{});
   assert.match(html,/uge 1/);
+  assert.match(html,/2 sæt/);
+  assert.match(html,/60 kg × 6 reps/);
+  assert.match(html,/55 kg × 5 reps/);
   assert.equal(api.previousSetText(last.sets[0],{}),'60 kg × 6 reps');
   assert.equal(api.previousSetText(last.sets[1],{}),'55 kg × 5 reps');
 });
