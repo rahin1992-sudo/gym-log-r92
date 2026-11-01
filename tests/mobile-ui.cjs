@@ -44,7 +44,8 @@ const server = http.createServer((req,res)=>{
     const primary=await open.locator('[data-next-set]').boundingBox();
     const navigation=await page.locator('.tabbar').boundingBox();
     assert.ok(primary.y+primary.height<=navigation.y,'The next-set action must be fully visible above mobile navigation');
-    assert.match(await open.locator('.set-previous').first().textContent(),/60 kg × 6 reps/);
+    assert.match(await open.locator('.previous-session li').first().textContent(),/60 kg × 6 reps/);
+    assert.match(await open.locator('.previous-session li').nth(1).textContent(),/60 kg × 5 reps/);
     await open.locator('[data-r="0"]').fill('6');
     await open.locator('[data-next-set]').click();
     assert.equal(await page.evaluate(()=>state.logs['min-max-phase-2|w2|d0|e0'].sets[0].done),true);

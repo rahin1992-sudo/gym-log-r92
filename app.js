@@ -872,11 +872,16 @@ function previousSetText(set, ex) {
   return `${weight ? `${weight} kg` : "Vægt ikke registreret"}${reps ? ` × ${reps} reps` : " · reps ikke registreret"}`;
 }
 
-function previousSession(last, currentDay) {
-  if (!last) return '<p class="previous-session previous-title">Ingen tidligere træning registreret.</p>';
-  const title = last.source === "sheet" ? "Excel-historik" : "Tidligere træning";
-  const day = last.day && last.day !== currentDay ? ` · ${escapeHtml(last.day)}` : "";
-  return `<p class="previous-session previous-title">${title} · uge ${last.week}${day}</p>`;
+function previousSession(last, ex) {
+  if (!last) return '<p class="previous-session empty">Ingen tidligere træning registreret.</p>';
+  const title = last.source === "sheet" ? "Excel-historik" : "Sidst registreret";
+  const recorded = last.sets.filter((set) => String(set.weight ?? "").trim() || String(set.reps ?? "").trim()).length;
+  const count = recorded === last.sets.length ? `${recorded} sæt` : `${recorded} af ${last.sets.length} sæt registreret`;
+  return `<section class="previous-session" aria-label="Sidste træningsresultater">
+    <p class="previous-title">${title} · uge ${last.week}${last.day ? ` · ${escapeHtml(last.day)}` : ""}</p>
+    <p class="previous-count">${count}</p>
+    <ol>${last.sets.map((set, i) => `<li><span>Sæt ${i + 1}</span><b>${escapeHtml(previousSetText(set, ex))}</b></li>`).join("")}</ol>
+  </section>`;
 }
 
 function abbreviationHelp(ex, chosen) {
@@ -945,7 +950,7 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
       </div>
       ${supersetHelp(week, dayIdx, ex)}
       ${ex.intensity && ex.intensity !== "N/A" ? (techniqueGuide(ex.intensity) ? `<div class="intensity-note"><b>Efter sidste sæt</b>${techniqueGuide(ex.intensity)}</div>` : `<p class="intensity-note">Sidste sæt: ${escapeHtml(ex.intensity)}</p>`) : ""}
-      ${previousSession(last, dayShort(weekByNumber(week).days[dayIdx].name))}
+      ${previousSession(last, ex)}
       <div class="sets"></div>
       <button class="next-set-action" type="button" data-next-set>${ICONS.check}<span></span></button>
       <div class="exercise-plan">
@@ -960,7 +965,7 @@ function exerciseCard(week, dayIdx, exIdx, ex, isOpen) {
     const row = el(`<div class="set-row ${s.done ? "done" : ""}">
       <div class="set-top">
         <div class="set-lab"><div>Sæt ${i + 1}${ex.rir?.[i] != null ? `<span class="set-effort">RIR ${escapeHtml(ex.rir[i])}</span>` : `<span class="set-effort">RPE ${escapeHtml(i === sets.length - 1 ? ex.lastRpe : ex.earlyRpe)}</span>`}</div>
-        ${last?.sets?.[i] ? `<div class="set-previous">Sidst: ${escapeHtml(previousSetText(last.sets[i], ex))}</div>` : ""}</div>
+        </div>
         <button class="set-check ${s.done ? "on" : ""}" data-sd="${i}" aria-label="${s.done ? "Fortryd" : "Markér"} sæt ${i + 1} lavet" aria-pressed="${Boolean(s.done)}">${ICONS.check}</button>
       </div>
       <div class="set-grid">

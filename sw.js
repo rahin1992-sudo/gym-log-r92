@@ -1,6 +1,6 @@
-const CACHE = "bts-lift-v23";
+const CACHE = "bts-lift-v24";
 const ASSETS = [
-  "./", "./index.html", "./styles.css?v=23", "./program-state.js?v=23", "./app.js?v=23",
+  "./", "./index.html", "./styles.css?v=24", "./program-state.js?v=24", "./app.js?v=24",
   "./program.json", "./program-min-max-phase2.json", "./pain.json",
   "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png",
 ];
